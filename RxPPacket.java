@@ -7,6 +7,13 @@ public class RxPPacket {
   private DatagramPacket packet;
   private ByteBuffer data;
 
+  // Should underlying structure, i.e. DatagramPacket 
+  // be encapsulated?
+  public RxPPacket(byte[] buf, int length) {
+    this.packet = new DatagramPacket(buf, length);
+    this.data = ByteBuffer.wrap(packet.getData());
+  }
+
   private RxPPacket(DatagramPacket packet) {
     this.packet = packet;
     this.data = ByteBuffer.wrap(packet.getData());
@@ -39,4 +46,21 @@ public class RxPPacket {
     }
   }
 
+  // For now, length = DatagramPacket length
+  // True length will include extra headers in packet
+  public int getLength() {
+    return packet.getLength();
+  }
+
+  public byte[] getData() {
+    return packet.getData();
+  }
+
+  public DatagramPacket getDatagramPacket() {
+    return this.packet;
+  }
+
+  public void setDatagramPacket(DatagramPacket dgPacket) {
+    this.packet = dgPacket;
+  }
 }

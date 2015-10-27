@@ -1,8 +1,14 @@
 import java.io.*;
+import java.net.InetAddress;
+import java.util.Arrays;
 
 public class FxAClient {
 
 	public static void main(String args[]) throws IOException {
+
+		String addr = "127.0.0.1";
+		InetAddress inetAddress = InetAddress.getByName(addr);
+		int port = 5000;
 
 	    if (args.length != 3) { // Test for correct # of args
 	      throw new IllegalArgumentException("Parameter(s): <port-evenNum>" +
@@ -12,7 +18,7 @@ public class FxAClient {
 	    RxPSocket socket = new RxPSocket();
 
 		// connect - The FxA-client connects to the FxA-server (running at the same IP host).
-	    socket.connect();
+	    socket.connect(inetAddress, 5000);
 
 		/*
 		 * get F
@@ -24,7 +30,7 @@ public class FxAClient {
 		FileMsg fileMsg = new FileMsg(true, filename);
 
 		// Change Text to Bin
-    	VoteMsgCoder coder = new VoteMsgTextCoder();
+    	MsgCoder coder = new FileMsgTextCoder();
     	byte[] encodedFile = coder.toWire(fileMsg);
     	System.out.println("Sending Text-Encoded Request (" + encodedFile.length
         + " bytes): ");
