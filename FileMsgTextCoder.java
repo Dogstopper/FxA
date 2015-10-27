@@ -18,7 +18,7 @@ public class FileMsgTextCoder implements MsgCoder {
 
 	public byte[] toWire(FileMsg msg) throws IOException {
 		String msgString = PROTOCOL + DELIMSTR
-			+ (msg.isGet()? GET : POST)
+			+ (msg.isGet()? GET : POST) + DELIMSTR
 			+ msg.getFilename();
 
 		byte data[] = msgString.getBytes(CHARSETNAME);
@@ -36,6 +36,7 @@ public class FileMsgTextCoder implements MsgCoder {
 
 		try {
 			token = s.next();
+
 			if (!token.equals(PROTOCOL)) {
 				throw new IOException("Bad protocol string: " + token);
 			}
@@ -49,7 +50,7 @@ public class FileMsgTextCoder implements MsgCoder {
 			}
 
 			token = s.next();
-			filename = s.next();
+			filename = token;
 		} catch (IOException ioe) {
 			throw new IOException("Parse error...");
 		}
