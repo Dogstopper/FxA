@@ -60,6 +60,10 @@ public class RxPPacket {
     return this.packet;
   }
 
+  public void setData(byte[] buf) {
+    this.packet.setData(buf);
+  }
+
   public void setDatagramPacket(DatagramPacket dgPacket) {
     this.packet = dgPacket;
   }
