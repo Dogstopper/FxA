@@ -23,6 +23,7 @@ public class RxPSocket {
   private State currentState;
   private Event event;
 
+  // Variables that are set in the LISTEN/ACCEPT phases.
   private byte[] inBuffer;
   private byte[] outBuffer;
   private InetAddress acceptedAddress;

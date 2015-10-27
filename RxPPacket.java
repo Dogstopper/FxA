@@ -20,9 +20,10 @@ public class RxPPacket {
   public static final int FLAGS_BYTE_OFFSET = 14;
   // TODO: ...
 
-  public static final byte FIN_MASK = (byte)0b0000_0001;
-  public static final byte SYN_MASK = (byte)0b0000_0010;
+  public static final byte FIN_MASK = 0b0000_0001;
+  public static final byte SYN_MASK = 0b0000_0010;
   public static final byte ACK_MASK = 0b0000_0100;
+  public static final byte PSH_MASK = 0b0000_1000;
   // TODO: ...
 
   public boolean isSYN() {
