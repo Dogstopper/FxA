@@ -18,20 +18,20 @@ public class FileMsgTextCoder implements MsgCoder {
 
 	public byte[] toWire(FileMsg msg) throws IOException {
 		String msgString = PROTOCOL + DELIMSTR
-			+ (msg.isGet(): GET ? POST)
+			+ (msg.isGet()? GET : POST)
 			+ msg.getFilename();
 
 		byte data[] = msgString.getBytes(CHARSETNAME);
 		return data;
 	}
 
-	public VoteMsg fromWire(byte[] message) throws IOException {
+	public FileMsg fromWire(byte[] message) throws IOException {
 		ByteArrayInputStream msgStream = new ByteArrayInputStream(message);
 		Scanner s = new Scanner(new InputStreamReader(msgStream, CHARSETNAME));
-		
+
 		boolean isGet;
 		String filename;
-		
+
 		String token;
 
 		try {

@@ -1,4 +1,6 @@
-public class FxA-client {
+import java.io.*;
+
+public class FxAClient {
 
 	public static void main(String args[]) throws IOException {
 
@@ -12,7 +14,7 @@ public class FxA-client {
 		// connect - The FxA-client connects to the FxA-server (running at the same IP host).
 	    socket.connect();
 
-		/* 
+		/*
 		 * get F
 		 * The FxA-client downloads file F from the server (if F exists in the same directory with the FxA-server program).
 	     */
@@ -42,13 +44,13 @@ public class FxA-client {
     	fileMsg = coder.fromWire(encodedFile);
     	System.out.println(fileMsg);
 
-		/* 
+		/*
 		 * post F
-		 * The FxA-client uploads file F to the server (if F exists in the same directory with the FxA-client program). This feature will be treated as extra credit for up to 20 project points. 
+		 * The FxA-client uploads file F to the server (if F exists in the same directory with the FxA-client program). This feature will be treated as extra credit for up to 20 project points.
 		 */
 
-		// window W (only for projects that support configurable flow window) W: the maximum receiver’s window-size at the FxA-Client (in segments). 
+		// window W (only for projects that support configurable flow window) W: the maximum receiver’s window-size at the FxA-Client (in segments).
 
-		// disconnect - The FxA-client terminates gracefully from the FxA-server. 
+		// disconnect - The FxA-client terminates gracefully from the FxA-server.
 	}
 }

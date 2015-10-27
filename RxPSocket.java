@@ -53,11 +53,10 @@ public class RxPSocket {
   private boolean stateMachineTransition() {
     try {
       switch (this.currentState) {
-        case State.CLOSED:
+        case CLOSED:
           if (this.event == Event.LISTEN) {
             System.out.println("Moving from CLOSED to LISTEN");
             this.currentState = State.LISTEN;
-            this.handleListen();
           }
           else if (this.event == Event.CONNECT) {
             System.out.println("Moving from CLOSED to SYN_SENT");
@@ -65,30 +64,51 @@ public class RxPSocket {
           }
           break;
 
-        case State.LISTEN:
+        case LISTEN:
+          break;
           // Implement
 
         default:
           // Check for timeout.
+          break;
       }
     } catch(Exception e) {
       // TODO: Error Handling
     }
+    return true;
   }
 
+  // Implement the state behavior. It's consolidated in the switch
+  // so that when timeouts occur, it's trivial to repeat a state
+  private void stateMachineAction() {
+    try {
+      switch (this.currentState) {
+        case CLOSED:
+          break;
+        case LISTEN:
+          handleListen();
+          break;
+      }
+    } catch(Exception e) {
+      // Handle this crap
+    }
+  }
 
-  private void handleListen() {
+  private void handleListen() throws IOException {
     // We need to allocate space for the buffers
     if (currentState == State.CLOSED) {
       inBuffer = new byte[MAX_PACKET_SIZE];
       outBuffer = new byte[MAX_PACKET_SIZE];
 
       // Accept a new client
-      while (true) {
+      while (true) { // Loop until we get a SYN packet.
         DatagramPacket packet = new DatagramPacket(inBuffer, inBuffer.length);
         dgSocket.receive(packet);
 
-        // TODO: Convert into an RxPPacket and check if SYN;
+        RxPPacket rxpPacket = RxPPacket.initializeFromDatagramPacket(packet);
+        if (rxpPacket.isSYN()) {
+          break;
+        }
       }
     }
   }

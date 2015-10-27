@@ -1,6 +1,6 @@
 import java.io.IOException;
 
 public interface MsgCoder {
-  byte[] toWire(VoteMsg msg) throws IOException;
-  VoteMsg fromWire(byte[] input) throws IOException;
+  byte[] toWire(FileMsg msg) throws IOException;
+  FileMsg fromWire(byte[] input) throws IOException;
 }
