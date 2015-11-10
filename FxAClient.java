@@ -1,3 +1,4 @@
+// java FxAClient 8080 localhost 5000
 import java.io.*;
 import java.net.InetAddress;
 import java.util.Arrays;
@@ -6,19 +7,27 @@ public class FxAClient {
 
 	public static void main(String args[]) throws IOException {
 
-		String addr = "127.0.0.1";
-		InetAddress inetAddress = InetAddress.getByName(addr);
-		int port = 5000;
+		InetAddress localhost = InetAddress.getByName("127.0.0.1");
+		int port = 8080;
+		String netEmuIPString = "localhost";
+		InetAddress netEmuInetAddress;
+		int netEmuPort = 5000;
 
 	    if (args.length != 3) { // Test for correct # of args
 	      throw new IllegalArgumentException("Parameter(s): <port-evenNum>" +
 	                                          " <NetEmu-IP> <NetEmu-Port#>");
 	    }
 
-	    RxPSocket socket = new RxPSocket();
+	    port = Integer.parseInt(args[0]);
+	    netEmuIPString = args[1];
+	    netEmuPort = Integer.parseInt(args[2]);
 
-		// connect - The FxA-client connects to the FxA-server (running at the same IP host).
-	    socket.connect(inetAddress, 5000);
+	    netEmuInetAddress = InetAddress.getByName(netEmuIPString);
+
+	    RxPSocket socket = new RxPSocket(port, localhost);
+
+		// connect - The FxA-client connects to the NetEmu which then connects to the FxA-server (running at the same IP host).
+	    socket.connect(netEmuInetAddress, netEmuPort);
 
 		/*
 		 * get F
