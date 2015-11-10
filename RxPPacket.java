@@ -4,34 +4,55 @@ import java.nio.ByteBuffer;
 
 public class RxPPacket {
 
+  public static final int DEFAULT_PACKET_SIZE = 200;
+
   private DatagramPacket packet;
   private ByteBuffer data;
 
-  // Should underlying structure, i.e. DatagramPacket 
-  // be encapsulated?
   public RxPPacket(byte[] buf, int length) {
     this.packet = new DatagramPacket(buf, length);
     this.data = ByteBuffer.wrap(packet.getData());
   }
 
-  private RxPPacket(DatagramPacket packet) {
+  public RxPPacket(DatagramPacket packet) {
     this.packet = packet;
     this.data = ByteBuffer.wrap(packet.getData());
   }
 
-  public static final RxPPacket initializeFromDatagramPacket(DatagramPacket dg) {
-    return new RxPPacket(dg);
+  public RxPPacket() {
+    this.data = allocate(DEFAULT_PACKET_SIZE);
+    this.packet = new DatagramPacket(this.data.array(), DEFAULT_PACKET_SIZE);
   }
 
   //---- Masks and information pertaining to the header
-  public static final int FLAGS_BYTE_OFFSET = 14;
-  // TODO: ...
+  public static final int SOURCE_PORT_OFFSET = 0;
+  public static final int DEST_PORT_OFFSET = 2;
+  public static final int SEQ_NUMBER_OFFSET = 4;
+  public static final int ACK_NUMBER_OFFSET = 8;
+  public static final int FLAGS_BYTE_OFFSET = 13;
+  public static final int WINDOW_SIZE_OFFSET = 15;
+  public static final int CHECKSUM_OFFSET = 16;
+  public static final int PAYLOAD_OFFSET = 20;
 
-  public static final byte FIN_MASK = 0b0000_0001;
-  public static final byte SYN_MASK = 0b0000_0010;
-  public static final byte ACK_MASK = 0b0000_0100;
-  public static final byte PSH_MASK = 0b0000_1000;
-  // TODO: ...
+  public static final byte FIN_MASK = 0b00000001;
+  public static final byte SYN_MASK = 0b00000010;
+  public static final byte ACK_MASK = 0b00000100;
+  public static final byte PSH_MASK = 0b00001000;
+
+  //---- Functions that allow for getting and setting of bit flags
+  public boolean isFIN() {
+    byte result = (byte) ( this.data.get(FLAGS_BYTE_OFFSET) & FIN_MASK);
+    return result == FIN_MASK;
+  }
+
+  public void setFIN(boolean set) {
+    byte newByte = this.data.get(FLAGS_BYTE_OFFSET);
+    if (set) {
+      newByte = (byte)(newByte | FIN_MASK);
+    } else {
+      newByte = (byte)(newByte & ~FIN_MASK);
+    }
+  }
 
   public boolean isSYN() {
     byte result = (byte) ( this.data.get(FLAGS_BYTE_OFFSET) & SYN_MASK);
@@ -47,25 +68,103 @@ public class RxPPacket {
     }
   }
 
-  // For now, length = DatagramPacket length
-  // True length will include extra headers in packet
+  public boolean isACK() {
+    byte result = (byte) ( this.data.get(FLAGS_BYTE_OFFSET) & ACK_MASK);
+    return result == ACK_MASK;
+  }
+
+  public void setACK(boolean set) {
+    byte newByte = this.data.get(FLAGS_BYTE_OFFSET);
+    if (set) {
+      newByte = (byte)(newByte | ACK_MASK);
+    } else {
+      newByte = (byte)(newByte & ~ACK_MASK);
+    }
+  }
+
+  public boolean isPSH() {
+    byte result = (byte) ( this.data.get(FLAGS_BYTE_OFFSET) & PSH_MASK);
+    return result == SYN_PSH;
+  }
+
+  public void setPSH(boolean set) {
+    byte newByte = this.data.get(FLAGS_BYTE_OFFSET);
+    if (set) {
+      newByte = (byte)(newByte | PSH_MASK);
+    } else {
+      newByte = (byte)(newByte & ~PSH_MASK);
+    }
+  }
+
+  //---- Getters and setters for RxPPacket items.
+  public short getSrcPort() {
+    return data.getShort(SOURCE_PORT_OFFSET);
+  }
+
+  public void setSrcPort(short port) {
+    return data.setShort(SOURCE_PORT_OFFSET, port);
+  }
+
+  public short getDestPort() {
+    return data.getShort(DEST_PORT_OFFSET);
+  }
+
+  public void setSrcPort(short port) {
+    return data.setShort(DEST_PORT_OFFSET, port);
+  }
+
+  public int getSeqNum() {
+    return data.getInt(SEQ_NUMBER_OFFSET);
+  }
+
+  public void setSeqNum(int seqNum) {
+    return data.setShort(SEQ_NUMBER_OFFSET, seqNum);
+  }
+
+  public short getAckNum() {
+    return data.getShort(ACK_NUMBER_OFFSET);
+  }
+
+  public void setAckNumber(int ack) {
+    return data.setShort(ACK_NUMBER_OFFSET, port);
+  }
+
+  public short getWindowSize() {
+    return data.getShort(WINDOW_SIZE_OFFSET);
+  }
+
+  public void setWindowSize(short port) {
+    return data.setShort(WINDOW_SIZE_OFFSET, port);
+  }
+
+  public short getChecksum() {
+    return data.getShort(CHECKSUM_OFFSET);
+  }
+
+  public void calculateChecksum() {
+    // TODO: Implement.
+  }
+
+  // Returns the length that the payload can be.
   public int getLength() {
-    return packet.getLength();
+    return packet.getLength() - PAYLOAD_OFFSET;
   }
 
+  // Retrives the payload data.
   public byte[] getData() {
-    return packet.getData();
+    byte[] payload = new byte[getLength()];
+    data.get(payload, PAYLOAD_OFFSET, payload.length);
+    return payload;
   }
 
-  public DatagramPacket getDatagramPacket() {
-    return this.packet;
-  }
-
+  // Sets the payload data
   public void setData(byte[] buf) {
-    this.packet.setData(buf);
+    data.put(buf, PAYLOAD_OFFSET, getLength());
   }
 
-  public void setDatagramPacket(DatagramPacket dgPacket) {
-    this.packet = dgPacket;
+  public DatagramPacket asDatagramPacket() {
+    this.packet = new DatagramPacket(data, data.length,
+        this.packet.getAddress(), getDestPort()); // Sync everything.
+    return this.packet;
   }
 }
