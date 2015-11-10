@@ -120,4 +120,20 @@ public class RxPSocket {
         stateMachineTransition();
   }
 
+  /* Connect, Send, and Receive Methods */
+  public void connect(InetAddress address, int port) {
+    dgSocket.connect(address, port);
+  }
+
+  public void send(RxPPacket packet) throws IOException {
+
+    DatagramPacket dgPacket = packet.getDatagramPacket();
+    dgSocket.send(dgPacket);
+  }
+
+  public void receive(RxPPacket packet) throws IOException {
+    DatagramPacket dgPacket = packet.getDatagramPacket();
+    dgSocket.receive(dgPacket);
+    packet.setDatagramPacket(dgPacket);
+  }
 }
