@@ -20,7 +20,7 @@ public class RxPPacket {
   }
 
   public RxPPacket() {
-    this.data = allocate(DEFAULT_PACKET_SIZE);
+    this.data = ByteBuffer.allocate(DEFAULT_PACKET_SIZE);
     this.packet = new DatagramPacket(this.data.array(), DEFAULT_PACKET_SIZE);
   }
 
@@ -84,7 +84,7 @@ public class RxPPacket {
 
   public boolean isPSH() {
     byte result = (byte) ( this.data.get(FLAGS_BYTE_OFFSET) & PSH_MASK);
-    return result == SYN_PSH;
+    return result == PSH_MASK;
   }
 
   public void setPSH(boolean set) {
@@ -102,15 +102,15 @@ public class RxPPacket {
   }
 
   public void setSrcPort(short port) {
-    return data.setShort(SOURCE_PORT_OFFSET, port);
+    data.putShort(SOURCE_PORT_OFFSET, port);
   }
 
   public short getDestPort() {
     return data.getShort(DEST_PORT_OFFSET);
   }
 
-  public void setSrcPort(short port) {
-    return data.setShort(DEST_PORT_OFFSET, port);
+  public void setDestPort(short port) {
+    data.putShort(DEST_PORT_OFFSET, port);
   }
 
   public int getSeqNum() {
@@ -118,15 +118,15 @@ public class RxPPacket {
   }
 
   public void setSeqNum(int seqNum) {
-    return data.setShort(SEQ_NUMBER_OFFSET, seqNum);
+    data.putInt(SEQ_NUMBER_OFFSET, seqNum);
   }
 
-  public short getAckNum() {
-    return data.getShort(ACK_NUMBER_OFFSET);
+  public int getAckNum() {
+    return data.getInt(ACK_NUMBER_OFFSET);
   }
 
   public void setAckNumber(int ack) {
-    return data.setShort(ACK_NUMBER_OFFSET, port);
+    data.putInt(ACK_NUMBER_OFFSET, ack);
   }
 
   public short getWindowSize() {
@@ -134,7 +134,7 @@ public class RxPPacket {
   }
 
   public void setWindowSize(short port) {
-    return data.setShort(WINDOW_SIZE_OFFSET, port);
+    data.putShort(WINDOW_SIZE_OFFSET, port);
   }
 
   public short getChecksum() {
@@ -163,8 +163,8 @@ public class RxPPacket {
   }
 
   public DatagramPacket asDatagramPacket() {
-    this.packet = new DatagramPacket(data, data.length,
-        this.packet.getAddress(), getDestPort()); // Sync everything.
+    this.packet = new DatagramPacket(data.array(), data.array().length,
+        this.packet.getAddress(), (int)getDestPort()); // Sync everything.
     return this.packet;
   }
 }
