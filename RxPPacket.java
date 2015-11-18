@@ -120,11 +120,11 @@ public class RxPPacket {
     data.putInt(SEQ_NUMBER_OFFSET, seqNum);
   }
 
-  public int getAckNum() {
+  public int getACKNum() {
     return data.getInt(ACK_NUMBER_OFFSET);
   }
 
-  public void setAckNumber(int ack) {
+  public void setACKNum(int ack) {
     data.putInt(ACK_NUMBER_OFFSET, ack);
   }
 
