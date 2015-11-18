@@ -6,22 +6,21 @@ public class RxPPacket {
 
   public static final int DEFAULT_PACKET_SIZE = 200;
 
-  private DatagramPacket packet;
   private ByteBuffer data;
 
-  public RxPPacket(byte[] buf, int length) {
-    this.packet = new DatagramPacket(buf, length);
-    this.data = ByteBuffer.wrap(packet.getData());
+  public RxPPacket(byte[] buf) {
+    //this.packet = new DatagramPacket(buf, length+PAYLOAD_OFFSET);
+    this.data = ByteBuffer.wrap(buf);
   }
 
   public RxPPacket(DatagramPacket packet) {
-    this.packet = packet;
+    //this.packet = packet;
     this.data = ByteBuffer.wrap(packet.getData());
   }
 
   public RxPPacket() {
     this.data = ByteBuffer.allocate(DEFAULT_PACKET_SIZE);
-    this.packet = new DatagramPacket(this.data.array(), DEFAULT_PACKET_SIZE);
+    //this.packet = new DatagramPacket(this.data.array(), DEFAULT_PACKET_SIZE);
   }
 
   //---- Masks and information pertaining to the header
@@ -147,24 +146,22 @@ public class RxPPacket {
 
   // Returns the length that the payload can be.
   public int getLength() {
-    return packet.getLength() - PAYLOAD_OFFSET;
+    return DEFAULT_PACKET_SIZE;
   }
 
   // Retrives the payload data.
-  public byte[] getData() {
+  public byte[] getPayload() {
     byte[] payload = new byte[getLength()];
     data.get(payload, PAYLOAD_OFFSET, payload.length);
     return payload;
   }
 
   // Sets the payload data
-  public void setData(byte[] buf) {
+  public void setPayload(byte[] buf) {
     data.put(buf, PAYLOAD_OFFSET, getLength());
   }
 
   public DatagramPacket asDatagramPacket() {
-    this.packet = new DatagramPacket(data.array(), data.array().length,
-        this.packet.getAddress(), (int)getDestPort()); // Sync everything.
-    return this.packet;
+    return new DatagramPacket(data.array(), data.array().length);
   }
 }

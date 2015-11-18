@@ -30,7 +30,7 @@ public class RxPSocket {
   // private byte[] inBuffer;
   // private byte[] outBuffer;
   private InetAddress acceptedAddress;
-  // private int acceptedPort;
+  ///private int acceptedPort;
 
   // TODO: Add a timer for timeouts.
 
@@ -139,10 +139,25 @@ public class RxPSocket {
       this.sendBuffer = sendBuffer;
     }
 
+    public boolean incrementOldestUnackedPointer() {
+      if (oldestUnackedPointer < sendBuffer.length) {
+        oldestUnackedPointer++;
+        return true;
+      }
+      return false;
+    }
+
     public void run() {
       // Send all unsent packets
       for (int i = oldestUnackedPointer; i < windowSize && i < sendBuffer.length; i++) {
-        dgSocket.send(sendBuffer[i].asDatagramPacket());
+        try {
+          DatagramPacket dg = sendBuffer[i].asDatagramPacket();
+          dg.setAddress(dgSocket.getInetAddress());
+          dg.setPort(dgSocket.getPort());
+          dgSocket.send(dg);
+        } catch(IOException e) {
+          // ACtually do not care. Timer will requeue these.
+        }
       }
     }
   }
@@ -154,18 +169,22 @@ public class RxPSocket {
     // Set a receive timeout so we can resend after a time, rather
     // than just having it block
     int timeoutMillis = 300;
-    dgSocket.setSoTimeout(timeoutMillis);
+    try {
+      dgSocket.setSoTimeout(timeoutMillis);
+    } catch(SocketException se) {
+      // TODO: Add error handling
+    }
 
     RxPPacket[] packetBuffer = new RxPPacket[packetBufferLength];
     // Create payload for each RxPPacket based on default packet size
     for (int i = 0; i < packetBuffer.length; i += 1) {
       byte[] payload = Arrays.copyOfRange(sendBuffer, i*RxPPacket.DEFAULT_PACKET_SIZE,
             RxPPacket.DEFAULT_PACKET_SIZE);
-      RxPPacket newPacket = new RxPPacket(payload, payload.length);
+      RxPPacket newPacket = new RxPPacket(payload);
       newPacket.setSeqNum(i); // TODO: Change this;
       newPacket.setDestPort((short)dgSocket.getPort());
       newPacket.setSrcPort((short)dgSocket.getLocalPort());
-      packetBuffer[i] = new RxPPacket(payload, payload.length);
+      packetBuffer[i] = newPacket;
     }
 
     // Add PSH flag
@@ -177,9 +196,8 @@ public class RxPSocket {
     Timer timer = new Timer();
 
     // Resend the current data every 300ms there is not an ACKed packet.
-    timer.scheduleAtFixedRate(
-      new ResendTimerTask(oldestUnackedPointer, windowSize, packetBuffer),
-    0, timeoutMillis);
+    ResendTimerTask resendTask = new ResendTimerTask(oldestUnackedPointer, windowSize, packetBuffer);
+    timer.scheduleAtFixedRate(resendTask, 0, timeoutMillis);
 
     // TODO: 2) Set Window Size
     byte[] packetPayload = new byte[RxPPacket.DEFAULT_PACKET_SIZE];
@@ -187,6 +205,7 @@ public class RxPSocket {
 
     while (oldestUnackedPointer != packetBuffer.length) {
       try {
+        // Wait for the ACK
         dgSocket.receive(packet);
         RxPPacket rxpPacket = new RxPPacket(packet);
         if (rxpPacket.isACK()) {
@@ -196,6 +215,10 @@ public class RxPSocket {
           // Otherwise, wait until it comes OR timeout occurs.
           if (ackNumber == packetBuffer[oldestUnackedPointer].getSeqNum()) {
             oldestUnackedPointer++;
+            boolean success = resendTask.incrementOldestUnackedPointer();
+            timer.cancel();
+            timer.scheduleAtFixedRate(resendTask, 0, timeoutMillis);
+
           }
         }
       } catch(IOException e) {
@@ -208,5 +231,6 @@ public class RxPSocket {
     // DatagramPacket dgPacket = packet.getDatagramPacket();
     // dgSocket.receive(dgPacket);
     // packet.setDatagramPacket(dgPacket);
+    return null;
   }
 }
