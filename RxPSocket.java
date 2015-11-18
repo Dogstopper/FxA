@@ -225,6 +225,7 @@ public class RxPSocket {
         // TODO: Handle Error;
       }
     }
+    timer.cancel();
   }
 
   public byte[] receive(int length) throws IOException {
