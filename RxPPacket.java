@@ -2,7 +2,13 @@ import java.net.*;
 import java.io.*;
 import java.nio.ByteBuffer;
 
+// Libraries for debugging
+import java.util.Arrays;
+import java.util.logging.*;
+
 public class RxPPacket {
+
+  public static final Logger log = Logger.getLogger(RxPPacket.class.getName());
 
   public static final int DEFAULT_PACKET_SIZE = 200;
 
@@ -149,10 +155,15 @@ public class RxPPacket {
     return DEFAULT_PACKET_SIZE;
   }
 
+  // TODO: Fix Index Out of Bounds
   // Retrives the payload data.
   public byte[] getPayload() {
-    byte[] payload = new byte[getLength()];
-    data.get(payload, PAYLOAD_OFFSET, payload.length);
+    byte[] payload = new byte[getLength() * 2];
+    data.get(payload, PAYLOAD_OFFSET, getLength());
+    
+    // Log Payload
+    log.logrb(Level.INFO, "RxPPacket", "getPayload()", "byte[] payload", Arrays.toString(payload));
+    
     return payload;
   }
 

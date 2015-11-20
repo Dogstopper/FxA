@@ -15,14 +15,14 @@ public class FxAServer {
 
     RxPSocket socket = new RxPSocket(port);
 
-    byte[] inBuffer = new byte[FileMsgTextCoder.MAX_WIRE_LENGTH];
+    // byte[] inBuffer = new byte[FileMsgTextCoder.MAX_WIRE_LENGTH];
     MsgCoder coder = new FileMsgTextCoder();
     FileService service = new FileService();
 
     while (true) {
       
       // Receive Buffer
-      inBuffer = socket.receive();
+      byte[] inBuffer = socket.receive();
 
       // Create packet from buffer
       RxPPacket packet = new RxPPacket(inBuffer);
