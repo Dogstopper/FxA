@@ -32,8 +32,7 @@ public class FxAServer {
       
       // TODO: Try to handle this from buffer/socket, should not have to create packet
       // TODO: Print this info from socket, not packet
-      System.out.println("Handling request from " + packet.asDatagramPacket().getSocketAddress() + " ("
-          + encodedMsg.length + " bytes)");
+      // System.out.println("Handling request from " + packet.asDatagramPacket().getSocketAddress() + " (" + encodedMsg.length + " bytes)");
 
       try {
 
