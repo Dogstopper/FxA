@@ -158,7 +158,7 @@ public class RxPPacket {
   // TODO: Fix Index Out of Bounds
   // Retrives the payload data.
   public byte[] getPayload() {
-    // Fix this bug, shouldn't be * 2
+    // Fix this bug, shouldn't be * 1.1
     byte[] payload = new byte[(int) (getLength() * 1.1)];
     data.get(payload, PAYLOAD_OFFSET, getLength());
     
