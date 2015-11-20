@@ -10,7 +10,7 @@ public class RxPPacket {
 
   public static final Logger log = Logger.getLogger(RxPPacket.class.getName());
 
-  public static final int DEFAULT_PACKET_SIZE = 2000;
+  public static final int DEFAULT_PACKET_SIZE = 200;
 
   private ByteBuffer data;
 
@@ -158,11 +158,12 @@ public class RxPPacket {
   // TODO: Fix Index Out of Bounds
   // Retrives the payload data.
   public byte[] getPayload() {
-    byte[] payload = new byte[getLength()];
+    // Fix this bug, shouldn't be * 2
+    byte[] payload = new byte[(int) (getLength() * 1.1)];
     data.get(payload, PAYLOAD_OFFSET, getLength());
     
     // Log Payload
-    log.logrb(Level.INFO, "RxPPacket", "getPayload()", "byte[] payload", Arrays.toString(payload));
+    log.logrb(Level.INFO, "RxPPacket", "getPayload()", "byte[] payload", javax.xml.bind.DatatypeConverter.printHexBinary(payload));
     
     return payload;
   }
