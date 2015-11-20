@@ -7,23 +7,27 @@ public class FxAClient {
 
 	public static void main(String args[]) throws IOException {
 
-		InetAddress localhost = InetAddress.getByName("127.0.0.1");
-		int port = 8080;
-		String netEmuIPString = "localhost";
-		InetAddress netEmuInetAddress;
-		int netEmuPort = 5000;
+		int port, netEmuPort;
 
-	    if (args.length != 3) { // Test for correct # of args
-	      throw new IllegalArgumentException("Parameter(s): <port-evenNum>" +
-	                                          " <NetEmu-IP> <NetEmu-Port#>");
+		String netEmuIPString;
+
+		InetAddress localhost = InetAddress.getByName("127.0.0.1"),
+					netEmuInetAddress;
+
+		// Test for correct # of args
+	    if (args.length != 3) { 
+	      throw new IllegalArgumentException("Parameter(s): <port-evenNum>" + " <NetEmu-IP> <NetEmu-Port#>");
 	    }
 
+	    // Initialize Port and NetEmu Address/Port with command line arguments
 	    port = Integer.parseInt(args[0]);
 	    netEmuIPString = args[1];
 	    netEmuPort = Integer.parseInt(args[2]);
 
+	    // Create NetEmu InetAddress Obj
 	    netEmuInetAddress = InetAddress.getByName(netEmuIPString);
 
+	    // Creates Client's RxPSocket bound to Client's localhost and even port
 	    RxPSocket socket = new RxPSocket(port, localhost);
 
 		// connect - The FxA-client connects to the NetEmu which then connects to the FxA-server (running at the same IP host).
@@ -40,23 +44,22 @@ public class FxAClient {
 
 		// Change Text to Bin
     	MsgCoder coder = new FileMsgTextCoder();
-    	byte[] encodedFile = coder.toWire(fileMsg);
-    	System.out.println("Sending Text-Encoded Request (" + encodedFile.length
-        + " bytes): ");
+    	byte[] encodedMsg = coder.toWire(fileMsg);
+    	System.out.println("Sending Text-Encoded Request (" + encodedMsg.length + " bytes): ");
         System.out.println(fileMsg);
 
-        RxPPacket message = new RxPPacket(encodedFile, encodedFile.length);
-        socket.send(message);
+        // Send bytes to RxPSocket
+        socket.send(encodedMsg);
 
         // Receive Response
-        message = new RxPPacket(new byte[FileMsgTextCoder.MAX_WIRE_LENGTH],
-        	FileMsgTextCoder.MAX_WIRE_LENGTH);
-        socket.receive(message);
-        encodedFile = Arrays.copyOfRange(message.getData(), 0, message.getLength());
+        byte[] inBuffer = socket.receive();
 
-        System.out.println("Received Text-Encoded Response (" + encodedFile.length
-        	+ " bytes): ");
-    	fileMsg = coder.fromWire(encodedFile);
+        // TODO: Try to handle this from buffer/socket, should not have to create packet
+        RxPPacket packet = new RxPPacket(inBuffer);
+        encodedMsg = Arrays.copyOfRange(packet.getPayload(), 0, packet.getLength());
+
+        System.out.println("Received Text-Encoded Response (" + encodedMsg.length + " bytes): ");
+    	fileMsg = coder.fromWire(encodedMsg);
     	System.out.println(fileMsg);
 
 		/*

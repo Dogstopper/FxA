@@ -231,7 +231,8 @@ public class RxPSocket {
   }
 
   // TODO: receive packet
-  public byte[] receive(int length) throws IOException {
+  // TODO: receive length? 
+  public byte[] receive() throws IOException {
 
     // Add to temp buffer
     List<RxPPacket> tempRxPPacketList = new ArrayList<>();

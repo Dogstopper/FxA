@@ -20,19 +20,32 @@ public class FxAServer {
     FileService service = new FileService();
 
     while (true) {
-      RxPPacket packet = new RxPPacket(inBuffer, inBuffer.length);
-      socket.receive(packet);
-      byte[] encodedMsg = Arrays.copyOfRange(packet.getData(), 0, packet.getLength());
-      System.out.println("Handling request from " + packet.getDatagramPacket().getSocketAddress() + " ("
+      
+      // Receive Buffer
+      inBuffer = socket.receive();
+
+      // Create packet from buffer
+      RxPPacket packet = new RxPPacket(inBuffer);
+      
+      // Print out encoded message
+      byte[] encodedMsg = Arrays.copyOfRange(packet.getPayload(), 0, packet.getLength());
+      
+      // TODO: Try to handle this from buffer/socket, should not have to create packet
+      // TODO: Print this info from socket, not packet
+      System.out.println("Handling request from " + packet.asDatagramPacket().getSocketAddress() + " ("
           + encodedMsg.length + " bytes)");
 
       try {
+
+        // open encoded message as a FileMsg
         FileMsg msg = coder.fromWire(encodedMsg);
         msg = service.handleRequest(msg);
-        packet.setData(coder.toWire(msg));
-        System.out.println("Sending response (" + packet.getLength() + " bytes):");
+        
+        // Send response (byte[]) from handledRequest
+        byte[] bytesToSend = coder.toWire(msg);
+        System.out.println("Sending response (" + bytesToSend.length + " bytes):");
         System.out.println(msg);
-        socket.send(packet);
+        socket.send(bytesToSend);
       } catch (IOException ioe) {
         System.err.println("Parse error in message: " + ioe.getMessage());
       }
