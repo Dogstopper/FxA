@@ -167,7 +167,7 @@ public class RxPSocket {
   // TODO: send window of packets
   public void send(byte[] sendBuffer) {
     int oldestUnackedPointer = 0;
-    int packetBufferLength = (int)Math.ceil((double)(sendBuffer.length) / RxPPacket.DEFAULT_PACKET_SIZE);
+    int packetBufferLength = (int) Math.ceil((double) (sendBuffer.length) / RxPPacket.DEFAULT_PACKET_SIZE);
 
     // Set a receive timeout so we can resend after a time, rather
     // than just having it block
@@ -183,10 +183,25 @@ public class RxPSocket {
     for (int i = 0; i < packetBuffer.length; i += 1) {
       byte[] payload = Arrays.copyOfRange(sendBuffer, i*RxPPacket.DEFAULT_PACKET_SIZE,
             RxPPacket.DEFAULT_PACKET_SIZE);
-      RxPPacket newPacket = new RxPPacket(payload);
-      newPacket.setSeqNum(i); // TODO: Change this;
-      newPacket.setDestPort((short)dgSocket.getPort());
-      newPacket.setSrcPort((short)dgSocket.getLocalPort());
+
+      short src = (short) dgSocket.getLocalPort();
+      short dest = (short) dgSocket.getPort();
+      int seqNum = i;
+      int ackNum = 0;
+      boolean fin = false;
+      boolean syn = false;
+      boolean ack = false;
+      boolean psh = false;
+      RxPPacket newPacket = new RxPPacket(src, 
+                                          dest, 
+                                          seqNum, 
+                                          ackNum, 
+                                          fin,
+                                          syn,
+                                          ack, 
+                                          psh);
+      newPacket.setPayload(payload);
+      
       packetBuffer[i] = newPacket;
     }
 
@@ -232,7 +247,8 @@ public class RxPSocket {
   }
 
   // TODO: receive packet
-  public byte[] receive(int length) throws IOException {
+  // TODO: receive length? 
+  public byte[] receive() throws IOException {
 
     // Add to temp buffer
     List<RxPPacket> tempRxPPacketList = new ArrayList<>();
@@ -243,8 +259,8 @@ public class RxPSocket {
       // Receive Datagram from Datagram Socket
       dgSocket.receive(dgPacket);
 
-      // Create RxPPacket from received Datagram 
-      RxPPacket receivedRxPPacket = new RxPPacket(dgPacket);
+      // Create RxPPacket from received Datagram Buffer 
+      RxPPacket receivedRxPPacket = new RxPPacket(dgPacket.getData());
 
       // Keep temporary list of received RxPPackets
       tempRxPPacketList.add(receivedRxPPacket);
