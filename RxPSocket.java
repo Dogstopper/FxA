@@ -259,7 +259,7 @@ public class RxPSocket {
       dgSocket.receive(dgPacket);
 
       // Create RxPPacket from received Datagram Buffer 
-s      RxPPacket receivedRxPPacket = new RxPPacket(dgPacket.getData());
+      RxPPacket receivedRxPPacket = new RxPPacket(dgPacket.getData());
 
       // Keep temporary list of received RxPPackets
       tempRxPPacketList.add(receivedRxPPacket);

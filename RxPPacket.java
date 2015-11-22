@@ -36,7 +36,7 @@ public class RxPPacket {
 
   // TODO: correctly put all attributes in buffer...
   public RxPPacket(short src, short dest, int seq, int ackNum, boolean fin, boolean syn, boolean ack, boolean psh) {
-    this.data = ByteBuffer.allocate(DEFAULT_PACKET_SIZE);
+    this.data = ByteBuffer.allocate(DEFAULT_PACKET_SIZE + 20);
     this.setSrcPort(src);
     this.setDestPort(dest);
     this.setSeqNum(seq);
@@ -187,8 +187,10 @@ public class RxPPacket {
 
   // Sets the payload data
   public void setPayload(byte[] buf) {
-    // data.put(buf, PAYLOAD_OFFSET, buf.length);
-    data.put(buf, 0, buf.length);
+    
+    for (int i = 0; i < buf.length; i++) {
+      data.put(i + PAYLOAD_OFFSET, buf[i]);
+    }
   }
 
   public DatagramPacket asDatagramPacket() {
