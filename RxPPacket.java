@@ -74,6 +74,7 @@ public class RxPPacket {
     } else {
       newByte = (byte)(newByte & ~FIN_MASK);
     }
+    this.data.put(FLAGS_BYTE_OFFSET, newByte);
   }
 
   public boolean isSYN() {
@@ -88,6 +89,7 @@ public class RxPPacket {
     } else {
       newByte = (byte)(newByte & ~SYN_MASK);
     }
+    this.data.put(FLAGS_BYTE_OFFSET, newByte);
   }
 
   public boolean isACK() {
@@ -102,6 +104,7 @@ public class RxPPacket {
     } else {
       newByte = (byte)(newByte & ~ACK_MASK);
     }
+    this.data.put(FLAGS_BYTE_OFFSET, newByte);
   }
 
   public boolean isPSH() {
