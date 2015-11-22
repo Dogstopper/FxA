@@ -186,12 +186,12 @@ public class RxPSocket {
 
       short src = (short) dgSocket.getLocalPort();
       short dest = (short) dgSocket.getPort();
-      int seqNum = i;
+      int seqNum = i+1;
       int ackNum = 0;
       boolean fin = false;
       boolean syn = false;
       boolean ack = false;
-      boolean psh = false;
+      boolean psh = true;
       RxPPacket newPacket = new RxPPacket(src,
                                           dest,
                                           seqNum,

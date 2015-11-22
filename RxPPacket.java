@@ -105,6 +105,7 @@ public class RxPPacket {
   }
 
   public boolean isPSH() {
+    System.out.println("FLAGS: " + this.data.get(FLAGS_BYTE_OFFSET));
     byte result = (byte) ( this.data.get(FLAGS_BYTE_OFFSET) & PSH_MASK);
     return result == PSH_MASK;
   }
@@ -116,6 +117,7 @@ public class RxPPacket {
     } else {
       newByte = (byte)(newByte & ~PSH_MASK);
     }
+    this.data.put(FLAGS_BYTE_OFFSET, newByte);
   }
 
   //---- Getters and setters for RxPPacket items.
@@ -174,8 +176,8 @@ public class RxPPacket {
 
   // Retrives the payload data.
   public byte[] getPayload() {
-    byte[] payload = new byte[getLength()];
-    data.flip(); // resets position in buffer to beginning 
+    byte[] payload = new byte[data.position()];
+    data.flip(); // resets position in buffer to beginning
     data.get(payload);
 
     // Log Payload
@@ -186,7 +188,7 @@ public class RxPPacket {
 
   // Sets the payload data
   public void setPayload(byte[] buf) {
-    
+
     for (int i = 0; i < buf.length; i++) {
       data.put(i + PAYLOAD_OFFSET, buf[i]);
     }
