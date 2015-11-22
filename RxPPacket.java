@@ -15,18 +15,36 @@ public class RxPPacket {
   private ByteBuffer data;
 
   public RxPPacket(byte[] buf) {
-    //this.packet = new DatagramPacket(buf, length+PAYLOAD_OFFSET);
-    this.data = ByteBuffer.wrap(buf);
+    System.out.println("Received Buffer: " + javax.xml.bind.DatatypeConverter.printHexBinary(buf));
+    byte[] dataBytes = Arrays.copyOfRange(buf, 0, DEFAULT_PACKET_SIZE);
+    System.out.println("Received Data: " + javax.xml.bind.DatatypeConverter.printHexBinary(dataBytes));
+
+    this.data = ByteBuffer.allocate(DEFAULT_PACKET_SIZE);
+    this.setPayload(dataBytes);
   }
 
   public RxPPacket(DatagramPacket packet) {
     //this.packet = packet;
     this.data = ByteBuffer.wrap(packet.getData());
+    // this.setPayload(packet.getData());
   }
 
   public RxPPacket() {
     this.data = ByteBuffer.allocate(DEFAULT_PACKET_SIZE);
     //this.packet = new DatagramPacket(this.data.array(), DEFAULT_PACKET_SIZE);
+  }
+
+  // TODO: correctly put all attributes in buffer...
+  public RxPPacket(short src, short dest, int seq, int ackNum, boolean fin, boolean syn, boolean ack, boolean psh) {
+    this.data = ByteBuffer.allocate(DEFAULT_PACKET_SIZE);
+    this.setSrcPort(src);
+    this.setDestPort(dest);
+    this.setSeqNum(seq);
+    this.setACKNum(ackNum);
+    this.setFIN(fin);
+    this.setSYN(syn);
+    this.setACK(ack);
+    this.setPSH(psh);
   }
 
   //---- Masks and information pertaining to the header
@@ -155,22 +173,22 @@ public class RxPPacket {
     return DEFAULT_PACKET_SIZE;
   }
 
-  // TODO: Fix Index Out of Bounds
   // Retrives the payload data.
   public byte[] getPayload() {
-    // Fix this bug, shouldn't be * 1.1
-    byte[] payload = new byte[(int) (getLength() * 1.1)];
-    data.get(payload, PAYLOAD_OFFSET, getLength());
-    
+    byte[] payload = new byte[getLength()];
+    data.flip(); // resets position in buffer to beginning 
+    data.get(payload);
+
     // Log Payload
     log.logrb(Level.INFO, "RxPPacket", "getPayload()", "byte[] payload", javax.xml.bind.DatatypeConverter.printHexBinary(payload));
-    
+
     return payload;
   }
 
   // Sets the payload data
   public void setPayload(byte[] buf) {
-    data.put(buf, PAYLOAD_OFFSET, getLength());
+    // data.put(buf, PAYLOAD_OFFSET, buf.length);
+    data.put(buf, 0, buf.length);
   }
 
   public DatagramPacket asDatagramPacket() {

@@ -46,7 +46,7 @@ public class FxAClient {
     	MsgCoder coder = new FileMsgTextCoder();
     	byte[] encodedMsg = coder.toWire(fileMsg);
     	System.out.println("Sending Text-Encoded Request (" + encodedMsg.length + " bytes): ");
-        System.out.println(fileMsg);
+        System.out.println("Encoded Payload: " + javax.xml.bind.DatatypeConverter.printHexBinary(encodedMsg));
 
         // Send bytes to RxPSocket
         socket.send(encodedMsg);
