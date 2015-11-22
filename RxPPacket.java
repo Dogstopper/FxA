@@ -19,8 +19,7 @@ public class RxPPacket {
     byte[] dataBytes = Arrays.copyOfRange(buf, 0, DEFAULT_PACKET_SIZE);
     System.out.println("Received Data: " + javax.xml.bind.DatatypeConverter.printHexBinary(dataBytes));
 
-    this.data = ByteBuffer.allocate(DEFAULT_PACKET_SIZE);
-    this.setPayload(dataBytes);
+    this.data = ByteBuffer.wrap(dataBytes);
   }
 
   public RxPPacket(DatagramPacket packet) {
