@@ -149,6 +149,7 @@ public class RxPSocket {
     }
 
     public void run() {
+      System.out.println("Resending all packets");
       // Send all unsent packets
       for (int i = oldestUnackedPointer; i < windowSize && i < sendBuffer.length; i++) {
         try {
@@ -191,7 +192,7 @@ public class RxPSocket {
       boolean fin = false;
       boolean syn = false;
       boolean ack = false;
-      boolean psh = true;
+      boolean psh = false;
       RxPPacket newPacket = new RxPPacket(src,
                                           dest,
                                           seqNum,
@@ -221,7 +222,7 @@ public class RxPSocket {
     byte[] packetPayload = new byte[RxPPacket.DEFAULT_PACKET_SIZE];
     DatagramPacket packet = new DatagramPacket(packetPayload, packetPayload.length);
 
-    /*while (oldestUnackedPointer != packetBuffer.length) {
+    while (oldestUnackedPointer != packetBuffer.length) {
       try {
         // Wait for the ACK
         dgSocket.receive(packet);
@@ -229,21 +230,20 @@ public class RxPSocket {
 
         if (rxpPacket.isACK()) {
           int ackNumber = rxpPacket.getACKNum();
+          System.out.println("ACK Received: " + ackNumber);
 
           // If the ACK is equal to the oldest unACKed packet, move the index by one
           // Otherwise, wait until it comes OR timeout occurs.
           if (ackNumber == packetBuffer[oldestUnackedPointer].getSeqNum()) {
             oldestUnackedPointer++;
             boolean success = resendTask.incrementOldestUnackedPointer();
-            timer.cancel();
-            timer.scheduleAtFixedRate(resendTask, 0, timeoutMillis);
-
+            //timer.scheduleAtFixedRate(resendTask, 0, timeoutMillis);
           }
         }
       } catch(IOException e) {
         // TODO: Handle Error;
       }
-    }*/
+    }
     timer.cancel();
   }
 
@@ -265,33 +265,38 @@ public class RxPSocket {
 
       // Keep temporary list of received RxPPackets
       tempRxPPacketList.add(receivedRxPPacket);
+
+      // Make an ACK
+      RxPPacket ackRxPPacket = new RxPPacket();
+      ackRxPPacket.setACK(true);
+      ackRxPPacket.setACKNum(receivedRxPPacket.getSeqNum());
+      ackRxPPacket.setDestPort((short)dgPacket.getPort());
+      ackRxPPacket.setSrcPort((short)dgSocket.getLocalPort());
+
+      // Send ACK
+      DatagramPacket dg = ackRxPPacket.asDatagramPacket();
+      dg.setAddress(dgPacket.getAddress());
+      dg.setPort(dgPacket.getPort());
+      dgSocket.send(dg);
+
       if (receivedRxPPacket.isPSH()) {
-
-        RxPPacket ackRxPPacket = new RxPPacket();
-        ackRxPPacket.setACK(true);
-        ackRxPPacket.setACKNum(receivedRxPPacket.getSeqNum() + 1);
-
-        // TODO: send ACK
-
         break;
       }
     }
 
-    // TODO: Sort temp list by sequence numbers
-
-    // TODO: expectedSeqNum should not reset everytime receive is called.
-    // What is the expected sequence number of the first packet? 1?
-    int expectedSeqNum = 1;
-
-    // TODO: Make sure received packets are not corrupt, duplicate, out of order
-    for (RxPPacket tempPacket : tempRxPPacketList) {
-
-      // send handles duplicate packets, check if corrupted or out of order
-      if (isCorrupt(tempPacket) || isOutOfOrder(tempPacket, expectedSeqNum)) {
-        // TODO: Timeout
-      }
-      expectedSeqNum++;
-    }
+    // // TODO: expectedSeqNum should not reset everytime receive is called.
+    // // What is the expected sequence number of the first packet? 1?
+    // int expectedSeqNum = 1;
+    //
+    // // TODO: Make sure received packets are not corrupt, duplicate, out of order
+    // for (RxPPacket tempPacket : tempRxPPacketList) {
+    //
+    //   // send handles duplicate packets, check if corrupted or out of order
+    //   if (isCorrupt(tempPacket) || isOutOfOrder(tempPacket, expectedSeqNum)) {
+    //     // TODO: Timeout
+    //   }
+    //   expectedSeqNum++;
+    // }
 
     // If tempPackets pass all the tests (not dup, corrupt, out of order)
     // give the application a byte buffer
@@ -300,7 +305,6 @@ public class RxPSocket {
 
       // getPayload returns an array of bytes, add each byte to the byteList
       for (Byte payloadByte : tempPacket.getPayload()) {
-
         receivedByteList.add(payloadByte);
       }
     }
