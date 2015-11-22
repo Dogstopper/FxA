@@ -192,16 +192,16 @@ public class RxPSocket {
       boolean syn = false;
       boolean ack = false;
       boolean psh = false;
-      RxPPacket newPacket = new RxPPacket(src, 
-                                          dest, 
-                                          seqNum, 
-                                          ackNum, 
+      RxPPacket newPacket = new RxPPacket(src,
+                                          dest,
+                                          seqNum,
+                                          ackNum,
                                           fin,
                                           syn,
-                                          ack, 
+                                          ack,
                                           psh);
       newPacket.setPayload(payload);
-      
+
       packetBuffer[i] = newPacket;
     }
 
@@ -221,11 +221,12 @@ public class RxPSocket {
     byte[] packetPayload = new byte[RxPPacket.DEFAULT_PACKET_SIZE];
     DatagramPacket packet = new DatagramPacket(packetPayload, packetPayload.length);
 
-    while (oldestUnackedPointer != packetBuffer.length) {
+    /*while (oldestUnackedPointer != packetBuffer.length) {
       try {
         // Wait for the ACK
         dgSocket.receive(packet);
         RxPPacket rxpPacket = new RxPPacket(packet);
+
         if (rxpPacket.isACK()) {
           int ackNumber = rxpPacket.getACKNum();
 
@@ -242,12 +243,12 @@ public class RxPSocket {
       } catch(IOException e) {
         // TODO: Handle Error;
       }
-    }
+    }*/
     timer.cancel();
   }
 
   // TODO: receive packet
-  // TODO: receive length? 
+  // TODO: receive length?
   public byte[] receive() throws IOException {
 
     // Add to temp buffer
@@ -259,13 +260,13 @@ public class RxPSocket {
       // Receive Datagram from Datagram Socket
       dgSocket.receive(dgPacket);
 
-      // Create RxPPacket from received Datagram Buffer 
+      // Create RxPPacket from received Datagram Buffer
       RxPPacket receivedRxPPacket = new RxPPacket(dgPacket.getData());
 
       // Keep temporary list of received RxPPackets
       tempRxPPacketList.add(receivedRxPPacket);
       if (receivedRxPPacket.isPSH()) {
-        
+
         RxPPacket ackRxPPacket = new RxPPacket();
         ackRxPPacket.setACK(true);
         ackRxPPacket.setACKNum(receivedRxPPacket.getSeqNum() + 1);
@@ -284,14 +285,14 @@ public class RxPSocket {
 
     // TODO: Make sure received packets are not corrupt, duplicate, out of order
     for (RxPPacket tempPacket : tempRxPPacketList) {
-      
+
       // send handles duplicate packets, check if corrupted or out of order
       if (isCorrupt(tempPacket) || isOutOfOrder(tempPacket, expectedSeqNum)) {
         // TODO: Timeout
       }
       expectedSeqNum++;
     }
-    
+
     // If tempPackets pass all the tests (not dup, corrupt, out of order)
     // give the application a byte buffer
     List<Byte> receivedByteList = new ArrayList<>();
@@ -304,7 +305,7 @@ public class RxPSocket {
       }
     }
 
-    // Byte to byte ... 
+    // Byte to byte ...
     byte[] receivedBytes = new byte[receivedByteList.size()];
     for (int i = 0; i < receivedBytes.length; i++) {
       receivedBytes[i] = receivedByteList.get(i);
