@@ -21,10 +21,9 @@ public class ConnectionManager {
 		this.connectionList = new ArrayList<>();
 	}
 
-	public Connection newConnection(RxPPacket packet) {
-		
-		short destination = packet.getDestPort();
-		short source = packet.getSrcPort();
+	// Return a connection in the connectionList
+	public Connection getConnection(short destination, short source) {
+		// if connection does not exist create a new connection
 
 		// Does this connection already exist?
 		for (Connection c : connectionList) {
@@ -34,16 +33,9 @@ public class ConnectionManager {
 			}
 		}
 
+		// Create a new connection
 		Connection connection = new Connection(destination, source);
-		
-		// Connection should be entering "Trying To Establish" state
-		if (!connection.isTryingToEstablish()) {
-			
-			// Does packet contain JUST a SYN?
-			if (packet.isSYN() && !packet.isACK() && !packet.isPSH() && !packet.isFIN()) {
-				connection.setTryingToEstablish(true); 
-			}
-		}
+		connectionList.add(connection);
 		return connection;
 	}
 
@@ -52,52 +44,59 @@ public class ConnectionManager {
 		short destination = packet.getDestPort();
 		short source = packet.getSrcPort();
 
-		// Does this connection already exist?
-		for (Connection c : connectionList) {
+		Connection c = this.getConnection(destination, source);
 
-			if ((c.getDestination() == destination && c.getSource() == source) || (c.getDestination() == source && c.getSource() == destination)) {
-
-				if (!c.isTryingToEstablish()) {
-					
-					// Does packet contain JUST a SYN?
-					if (packet.isSYN() && !packet.isACK() && !packet.isPSH() && !packet.isFIN()) {
-						c.setTryingToEstablish(true); 
-					}
-				}
-
-				// Connection could be entering "About To Establish" state
-				if (c.isTryingToEstablish() && !c.isAboutToEstablish()) {
-
-					// Does packet contain JUST a SYN - ACK?
-					if (packet.isSYN() && packet.isACK() && !packet.isPSH() && !packet.isFIN()) {
-						c.setAboutToEstablish(true); 
-					}
-				}
-
-				// Connection could be entering "Establish" state
-				if (c.isTryingToEstablish() && c.isAboutToEstablish() && !c.isEstablished()) {
-
-					// Does packet contain JUST a SYN - ACK - PSH?
-					if (packet.isSYN() && packet.isACK() && packet.isPSH() && !packet.isFIN()) {
-						c.setEstablished(true); 
-					}
-				}
-
-				// Connection could be entering "Allowed To Send Data" state
-				if (c.isTryingToEstablish() && c.isAboutToEstablish() && c.isEstablished() && !c.isAllowedToSendData()) {
-
-					// Does packet contain JUST an ACK - PSH?
-					if (!packet.isSYN() && packet.isACK() && packet.isPSH() && !packet.isFIN()) {
-						c.setAllowedToSendData(true); 
-					}
-				}
+		if (!c.isTryingToEstablish()) {
+			
+			// Does packet contain JUST a SYN?
+			if (packet.isSYN() && !packet.isACK() && !packet.isPSH() && !packet.isFIN()) {
+				c.setTryingToEstablish(true); 
 			}
-			return c;
 		}
-		return null;
+
+		// Connection could be entering "About To Establish" state
+		if (c.isTryingToEstablish() && !c.isAboutToEstablish()) {
+
+			// Does packet contain JUST a SYN - ACK?
+			if (packet.isSYN() && packet.isACK() && !packet.isPSH() && !packet.isFIN()) {
+				c.setAboutToEstablish(true); 
+			}
+		}
+
+		// Connection could be entering "Establish" state
+		if (c.isTryingToEstablish() && c.isAboutToEstablish() && !c.isEstablished()) {
+
+			// Does packet contain JUST a SYN - ACK - PSH?
+			if (packet.isSYN() && packet.isACK() && packet.isPSH() && !packet.isFIN()) {
+				c.setEstablished(true); 
+			}
+		}
+
+		// Connection could be entering "Allowed To Send Data" state
+		if (c.isTryingToEstablish() && c.isAboutToEstablish() && c.isEstablished() && !c.isAllowedToSendData()) {
+
+			// Does packet contain JUST an ACK - PSH?
+			if (!packet.isSYN() && packet.isACK() && packet.isPSH() && !packet.isFIN()) {
+				c.setAllowedToSendData(true); 
+			}
+		}
+		
+		return c;
 	} 
 
 	public List<Connection> getConnectionList() {
 	    return this.connectionList;
+	}
+
+	public void removeConnection(short destination, short source) {
+
+		for (int i = 0; i < connectionList.size(); i++) {
+			Connection c = connectionList.get(i);
+
+			if ((c.getDestination() == destination && c.getSource() == source) || (c.getDestination() == source && c.getSource() == destination)) {
+				connectionList.remove(i);
+				break;
+			}
+		}
 	}
 }
