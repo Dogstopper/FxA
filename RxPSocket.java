@@ -202,8 +202,11 @@ public class RxPSocket {
                                           ack,
                                           psh);
       newPacket.setPayload(payload);
+      newPacket.setChecksum(newPacket.calculateChecksum());
 
       packetBuffer[i] = newPacket;
+
+      System.out.println("Packet " + i + ": " + javax.xml.bind.DatatypeConverter.printHexBinary(newPacket.getPayload()));
     }
 
     // Add PSH flag
@@ -254,7 +257,6 @@ public class RxPSocket {
     // Add to temp buffer
     List<RxPPacket> tempRxPPacketList = new ArrayList<>();
     DatagramPacket dgPacket = new DatagramPacket(new byte[MAX_PACKET_SIZE], MAX_PACKET_SIZE);
-    // TODO: set timeout on receive side
     // Receive until PSH flag is set or timeout occurs
     while (true) {
       // Receive Datagram from Datagram Socket
@@ -267,27 +269,34 @@ public class RxPSocket {
 
       //System.out.println("receivedRxPPacket.getPayload(): " + javax.xml.bind.DatatypeConverter.printHexBinary(receivedRxPPacket.getPayload()));
 
+      // Check the checksum to make sure no corruption occurred
+      long checksum = receivedRxPPacket.getChecksum();
+      long currentChecksum = receivedRxPPacket.calculateChecksum();
+      if (currentChecksum != checksum) {
+        System.out.println("Packet Corrupted");
+      }
+      else {
+        tempRxPPacketList.add(receivedRxPPacket);
 
-      // Keep temporary list of received RxPPackets
-      tempRxPPacketList.add(receivedRxPPacket);
+        // Make an ACK
+        RxPPacket ackRxPPacket = new RxPPacket();
+        ackRxPPacket.setACK(true);
+        ackRxPPacket.setACKNum(receivedRxPPacket.getSeqNum());
+        ackRxPPacket.setDestPort((short)dgPacket.getPort());
+        ackRxPPacket.setSrcPort((short)dgSocket.getLocalPort());
 
-      // Make an ACK
-      RxPPacket ackRxPPacket = new RxPPacket();
-      ackRxPPacket.setACK(true);
-      ackRxPPacket.setACKNum(receivedRxPPacket.getSeqNum());
-      ackRxPPacket.setDestPort((short)dgPacket.getPort());
-      ackRxPPacket.setSrcPort((short)dgSocket.getLocalPort());
+        // Send ACK
+        DatagramPacket dg = ackRxPPacket.asDatagramPacket();
+        dg.setAddress(dgPacket.getAddress());
+        dg.setPort(dgPacket.getPort());
+        dgSocket.send(dg);
 
-      // Send ACK
-      DatagramPacket dg = ackRxPPacket.asDatagramPacket();
-      dg.setAddress(dgPacket.getAddress());
-      dg.setPort(dgPacket.getPort());
-      dgSocket.send(dg);
+        System.out.println("Sending ACK: " + ackRxPPacket.getACKNum());
 
-      System.out.println("Sending ACK: " + ackRxPPacket.getACKNum());
-
-      if (receivedRxPPacket.isPSH()) {
-        break;
+        if (receivedRxPPacket.isPSH()) {
+          // Make sure the last ACK is received
+          break;
+        }
       }
     }
 

@@ -20,13 +20,11 @@ public class FxAServer {
     FileService service = new FileService();
 
     while (true) {
-      
+
       // Receive Buffer
       byte[] inBuffer = socket.receive();
-      
-      // Print out encoded message
-      byte[] encodedMsg = Arrays.copyOfRange(inBuffer, 0, inBuffer.length);
-      
+      System.out.println("Application Layer: " + javax.xml.bind.DatatypeConverter.printHexBinary(inBuffer));
+
       // TODO: Try to handle this from buffer/socket, should not have to create packet
       // TODO: Print this info from socket, not packet
       // System.out.println("Handling request from " + packet.asDatagramPacket().getSocketAddress() + " (" + encodedMsg.length + " bytes)");
@@ -35,7 +33,7 @@ public class FxAServer {
         // open encoded message as a FileMsg
         FileMsg msg = coder.fromWire(inBuffer);
         msg = service.handleRequest(msg);
-        
+
         // Send response (byte[]) from handledRequest
         byte[] bytesToSend = coder.toWire(msg);
         System.out.println("Sending response (" + bytesToSend.length + " bytes):");

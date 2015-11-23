@@ -1,6 +1,7 @@
 import java.net.*;
 import java.io.*;
 import java.nio.ByteBuffer;
+import java.util.zip.CRC32;
 
 import java.util.List;
 import java.util.ArrayList;
@@ -15,7 +16,7 @@ public class RxPPacket {
 
   public RxPPacket(byte[] buf) {
     //System.out.println("Received Buffer: " + javax.xml.bind.DatatypeConverter.printHexBinary(buf));
-    byte[] dataBytes = Arrays.copyOfRange(buf, 0, DEFAULT_PACKET_SIZE);
+    byte[] dataBytes = Arrays.copyOfRange(buf, 0, DEFAULT_PACKET_SIZE+20);
     System.out.println("Received Data: " + javax.xml.bind.DatatypeConverter.printHexBinary(dataBytes));
 
     this.data = ByteBuffer.wrap(dataBytes);
@@ -52,7 +53,7 @@ public class RxPPacket {
   public static final int ACK_NUMBER_OFFSET = 8;
   public static final int FLAGS_BYTE_OFFSET = 13;
   public static final int WINDOW_SIZE_OFFSET = 15;
-  public static final int CHECKSUM_OFFSET = 16;
+  public static final int CHECKSUM_OFFSET = DEFAULT_PACKET_SIZE;
   public static final int PAYLOAD_OFFSET = 20;
 
   public static final byte FIN_MASK = 0b00000001;
@@ -163,12 +164,19 @@ public class RxPPacket {
     data.putShort(WINDOW_SIZE_OFFSET, port);
   }
 
-  public short getChecksum() {
-    return data.getShort(CHECKSUM_OFFSET);
+  public long getChecksum() {
+    return data.getLong(CHECKSUM_OFFSET);
   }
 
-  public void calculateChecksum() {
-    // TODO: Implement.
+  public void setChecksum(long checksum) {
+    data.putLong(CHECKSUM_OFFSET, checksum);
+  }
+
+  public long calculateChecksum() {
+    byte[] buf = Arrays.copyOfRange(data.array(), 0, DEFAULT_PACKET_SIZE);
+    CRC32 hasher = new CRC32();
+    hasher.update(buf);
+    return hasher.getValue();
   }
 
   // Returns the length that the payload can be.
@@ -210,7 +218,7 @@ public class RxPPacket {
   public byte[] getPacketData() {
     byte[] payload = getPayload();
 
-    byte[] packetData = Arrays.copyOfRange(payload, PAYLOAD_OFFSET, payload.length);
+    byte[] packetData = Arrays.copyOfRange(payload, PAYLOAD_OFFSET, DEFAULT_PACKET_SIZE);
 
     return packetData;
   }
