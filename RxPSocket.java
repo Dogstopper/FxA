@@ -133,6 +133,7 @@ public class RxPSocket {
     private int oldestUnackedPointer;
     private int windowSize;
     private RxPPacket[] sendBuffer;
+    private int numTimesSilent = 0;
 
     public ResendTimerTask(int oldestUnackedPointer, int windowSize, RxPPacket[] sendBuffer) {
       this.oldestUnackedPointer = oldestUnackedPointer;
@@ -141,6 +142,7 @@ public class RxPSocket {
     }
 
     public boolean incrementOldestUnackedPointer() {
+      numTimesSilent = 0;
       if (oldestUnackedPointer < sendBuffer.length) {
         oldestUnackedPointer++;
         return true;
@@ -148,8 +150,18 @@ public class RxPSocket {
       return false;
     }
 
+    public int getNumTimesNoResponse() {
+      return numTimesSilent;
+    }
+
+    public void resetTimesNoResponse() {
+      numTimesSilent = 0;
+    }
+
     public void run() {
-      System.out.println("Resending all packets");
+      System.out.println("Resending " + windowSize + " packets");
+      numTimesSilent++;
+
       // Send all unsent packets
       for (int i = 0; i < windowSize && i < sendBuffer.length-oldestUnackedPointer; i++) {
         try {
@@ -231,6 +243,12 @@ public class RxPSocket {
         dgSocket.receive(packet);
         RxPPacket rxpPacket = new RxPPacket(packet);
 
+        // After 15 seconds of NO response, say that the server is offline
+        if (resendTask.getNumTimesNoResponse() == 50) {
+          System.err.println("Server is offline or network dropping too many packets.");
+          break;
+        }
+
         if (rxpPacket.isACK()) {
           int ackNumber = rxpPacket.getACKNum();
           System.out.println("ACK Received: " + ackNumber);
@@ -241,6 +259,23 @@ public class RxPSocket {
             oldestUnackedPointer++;
             boolean success = resendTask.incrementOldestUnackedPointer();
             //timer.scheduleAtFixedRate(resendTask, 0, timeoutMillis);
+          }
+
+          if (rxpPacket.isPSH()) {
+            // If the received packet is a PSH+ACK, then send a PSH+ACK and quit.
+            RxPPacket ackRxPPacket = new RxPPacket();
+            ackRxPPacket.setACK(true);
+            ackRxPPacket.setDestPort((short)packet.getPort());
+            ackRxPPacket.setSrcPort((short)dgSocket.getLocalPort());
+            ackRxPPacket.setPSH(true);
+            ackRxPPacket.setChecksum(ackRxPPacket.calculateChecksum());
+
+            // Send ACK+PSH
+            DatagramPacket dg = ackRxPPacket.asDatagramPacket();
+            dg.setAddress(packet.getAddress());
+            dg.setPort(packet.getPort());
+            dgSocket.send(dg);
+            System.out.println("Sending PSH+ACK");
           }
         }
       } catch(IOException e) {
@@ -254,13 +289,31 @@ public class RxPSocket {
   // TODO: receive length?
   public byte[] receive() throws IOException {
 
+    boolean PSH_ACKsent = false;
+
+    int timeoutMillis = 7000;
+    try {
+      dgSocket.setSoTimeout(timeoutMillis);
+    } catch(SocketException se) {
+      // TODO: Add error handling
+    }
+
     // Add to temp buffer
     List<RxPPacket> tempRxPPacketList = new ArrayList<>();
     DatagramPacket dgPacket = new DatagramPacket(new byte[MAX_PACKET_SIZE], MAX_PACKET_SIZE);
     // Receive until PSH flag is set or timeout occurs
     while (true) {
       // Receive Datagram from Datagram Socket
-      dgSocket.receive(dgPacket);
+      try {
+        dgSocket.receive(dgPacket);
+      } catch (SocketTimeoutException ste) {
+        if (PSH_ACKsent) {
+          break;
+        }
+        else {
+          continue;
+        }
+      }
 
       //System.out.println("dgPacket.getData(): " + javax.xml.bind.DatatypeConverter.printHexBinary(dgPacket.getData()));
 
@@ -284,6 +337,11 @@ public class RxPSocket {
         ackRxPPacket.setACKNum(receivedRxPPacket.getSeqNum());
         ackRxPPacket.setDestPort((short)dgPacket.getPort());
         ackRxPPacket.setSrcPort((short)dgSocket.getLocalPort());
+        if (receivedRxPPacket.isPSH()) {
+          ackRxPPacket.setPSH(true);
+          PSH_ACKsent = true;
+        }
+        ackRxPPacket.setChecksum(ackRxPPacket.calculateChecksum());
 
         // Send ACK
         DatagramPacket dg = ackRxPPacket.asDatagramPacket();
@@ -292,9 +350,7 @@ public class RxPSocket {
         dgSocket.send(dg);
 
         System.out.println("Sending ACK: " + ackRxPPacket.getACKNum());
-
-        if (receivedRxPPacket.isPSH()) {
-          // Make sure the last ACK is received
+        if (receivedRxPPacket.isACK() && receivedRxPPacket.isPSH()) {
           break;
         }
       }

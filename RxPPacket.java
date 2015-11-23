@@ -29,7 +29,7 @@ public class RxPPacket {
   }
 
   public RxPPacket() {
-    this.data = ByteBuffer.allocate(DEFAULT_PACKET_SIZE);
+    this.data = ByteBuffer.allocate(DEFAULT_PACKET_SIZE + 20);
     //this.packet = new DatagramPacket(this.data.array(), DEFAULT_PACKET_SIZE);
   }
 
