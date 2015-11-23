@@ -21,6 +21,7 @@ public class FileMsgTextCoder implements MsgCoder {
 			+ (msg.isGet()? GET : POST) + DELIMSTR
 			+ msg.getFilename();
 
+      System.out.println(msgString);
 		byte data[] = msgString.getBytes(CHARSETNAME);
 		return data;
 	}

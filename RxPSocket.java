@@ -151,9 +151,9 @@ public class RxPSocket {
     public void run() {
       System.out.println("Resending all packets");
       // Send all unsent packets
-      for (int i = oldestUnackedPointer; i < windowSize && i < sendBuffer.length; i++) {
+      for (int i = 0; i < windowSize && i < sendBuffer.length-oldestUnackedPointer; i++) {
         try {
-          DatagramPacket dg = sendBuffer[i].asDatagramPacket();
+          DatagramPacket dg = sendBuffer[i+oldestUnackedPointer].asDatagramPacket();
           dg.setAddress(dgSocket.getInetAddress());
           dg.setPort(dgSocket.getPort());
           dgSocket.send(dg);
@@ -183,7 +183,7 @@ public class RxPSocket {
     // Create payload for each RxPPacket based on default packet size
     for (int i = 0; i < packetBuffer.length; i += 1) {
       byte[] payload = Arrays.copyOfRange(sendBuffer, i*RxPPacket.DEFAULT_PACKET_SIZE,
-            RxPPacket.DEFAULT_PACKET_SIZE);
+            (i+1)*RxPPacket.DEFAULT_PACKET_SIZE);
 
       short src = (short) dgSocket.getLocalPort();
       short dest = (short) dgSocket.getPort();
@@ -192,7 +192,7 @@ public class RxPSocket {
       boolean fin = false;
       boolean syn = false;
       boolean ack = false;
-      boolean psh = false;
+      boolean psh = (i == packetBuffer.length - 1) ? true : false;
       RxPPacket newPacket = new RxPPacket(src,
                                           dest,
                                           seqNum,
@@ -207,7 +207,7 @@ public class RxPSocket {
     }
 
     // Add PSH flag
-    packetBuffer[packetBuffer.length - 1].setPSH(true);
+    //packetBuffer[packetBuffer.length - 1].setPSH(true);
 
     // The timer task is charged with resending all packets in the window
     // every time it is fired. It needs to be encapsulated in a class because
@@ -260,12 +260,12 @@ public class RxPSocket {
       // Receive Datagram from Datagram Socket
       dgSocket.receive(dgPacket);
 
-      System.out.println("dgPacket.getData(): " + javax.xml.bind.DatatypeConverter.printHexBinary(dgPacket.getData()));
+      //System.out.println("dgPacket.getData(): " + javax.xml.bind.DatatypeConverter.printHexBinary(dgPacket.getData()));
 
       // Create RxPPacket from received Datagram Buffer
       RxPPacket receivedRxPPacket = new RxPPacket(dgPacket.getData());
 
-      System.out.println("receivedRxPPacket.getPayload(): " + javax.xml.bind.DatatypeConverter.printHexBinary(receivedRxPPacket.getPayload()));
+      //System.out.println("receivedRxPPacket.getPayload(): " + javax.xml.bind.DatatypeConverter.printHexBinary(receivedRxPPacket.getPayload()));
 
 
       // Keep temporary list of received RxPPackets
@@ -283,6 +283,8 @@ public class RxPSocket {
       dg.setAddress(dgPacket.getAddress());
       dg.setPort(dgPacket.getPort());
       dgSocket.send(dg);
+
+      System.out.println("Sending ACK: " + ackRxPPacket.getACKNum());
 
       if (receivedRxPPacket.isPSH()) {
         break;

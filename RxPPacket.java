@@ -14,7 +14,7 @@ public class RxPPacket {
   private ByteBuffer data;
 
   public RxPPacket(byte[] buf) {
-    System.out.println("Received Buffer: " + javax.xml.bind.DatatypeConverter.printHexBinary(buf));
+    //System.out.println("Received Buffer: " + javax.xml.bind.DatatypeConverter.printHexBinary(buf));
     byte[] dataBytes = Arrays.copyOfRange(buf, 0, DEFAULT_PACKET_SIZE);
     System.out.println("Received Data: " + javax.xml.bind.DatatypeConverter.printHexBinary(dataBytes));
 

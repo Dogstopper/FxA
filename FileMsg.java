@@ -4,7 +4,8 @@ public class FileMsg {
 	// private byte[] file;
 
 	public FileMsg(boolean isGet, String filename) {
-		isGet = this.isGet;
+		this.isGet = isGet;
+    this.filename = filename;
 	}
 
 	public boolean isGet() {

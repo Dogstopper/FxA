@@ -15,7 +15,7 @@ public class FxAClient {
 					netEmuInetAddress;
 
 		// Test for correct # of args
-	    if (args.length != 3) { 
+	    if (args.length != 3) {
 	      throw new IllegalArgumentException("Parameter(s): <port-evenNum>" + " <NetEmu-IP> <NetEmu-Port#>");
 	    }
 
@@ -39,8 +39,8 @@ public class FxAClient {
 	     */
 
 	    boolean isGet = true;
-	    String filename = "helloworld.txt";
-		FileMsg fileMsg = new FileMsg(true, filename);
+	    String filename = "helloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txt";
+		    FileMsg fileMsg = new FileMsg(true, filename);
 
 		// Change Text to Bin
     	MsgCoder coder = new FileMsgTextCoder();
