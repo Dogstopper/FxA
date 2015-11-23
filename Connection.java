@@ -19,6 +19,17 @@ public class Connection {
 		this.isAllowedToSendData = false;
 	}
 
+	public String connectionStateToString() {
+
+		String state = this.source + "  -->  " + this.destination
+					+ "\nisTryingToEstablish: " + (this.isTryingToEstablish ? "1" : "0")
+					+ "\nisAboutToEstablish: " + (this.isAboutToEstablish ? "1" : "0")
+					+ "\nisEstablished: " + (this.isEstablished ? "1" : "0")
+					+ "\nisAllowedToSendData: " + (this.isAllowedToSendData ? "1" : "0");
+
+		return state;
+	}
+
 	/* Setters and Getters */
 
 	public short getDestination() {

@@ -77,17 +77,43 @@ public class RxPSocket {
     }
 
     public void run() {
-      System.out.println("Resending all packets");
-      // Send all unsent packets
-      for (int i = 0; i < windowSize && i < sendBuffer.length-oldestUnackedPointer; i++) {
-        try {
-          DatagramPacket dg = sendBuffer[i+oldestUnackedPointer].asDatagramPacket();
-          dg.setAddress(dgSocket.getInetAddress());
-          dg.setPort(dgSocket.getPort());
-          dgSocket.send(dg);
-        } catch(IOException e) {
-          // ACtually do not care. Timer will requeue these.
+
+      ConnectionManager cm = ConnectionManager.get();
+      Connection connection = cm.getConnection(sendBuffer[0]);
+      System.out.println(connection.connectionStateToString());
+
+      if (connection.isAllowedToSendData()) {
+
+        System.out.println("Resending all packets");
+        // Send all unsent packets
+        for (int i = 0; i < windowSize && i < sendBuffer.length-oldestUnackedPointer; i++) {
+          try {
+            DatagramPacket dg = sendBuffer[i+oldestUnackedPointer].asDatagramPacket();
+            dg.setAddress(dgSocket.getInetAddress());
+            dg.setPort(dgSocket.getPort());
+            dgSocket.send(dg);
+          } catch(IOException e) {
+            // ACtually do not care. Timer will requeue these.
+          }
         }
+      } else {
+
+        // Handshake Packet
+        RxPPacket packet = cm.getNextHandshakePacket(connection);
+
+        // Get RxPPacket Handshake Packet
+        DatagramPacket dg = packet.asDatagramPacket();
+
+        try {
+
+          // Send Handshake Packet
+          dgSocket.send(dg);
+          cm.updateConnection(packet);
+
+        } catch (IOException e) {
+          System.out.println("Handshake Packet did not send");
+        }
+  
       }
     }
   }
@@ -247,10 +273,14 @@ public class RxPSocket {
     List<Byte> receivedByteList = new ArrayList<>();
     for (RxPPacket tempPacket : tempRxPPacketList) {
 
-      // getPayload returns an array of bytes, add each byte to the byteList
-      for (int i = 0; i < tempPacket.getPacketData().length; i++) {
-        receivedByteList.add(tempPacket.getPacketData()[i]);
-      }
+      // If it's not a handshake packet, pass it up to the application
+      // if (!ConnectionManager.get().updateConnection(tempPacket)) {
+        
+        // getPayload returns an array of bytes, add each byte to the byteList
+        for (int i = 0; i < tempPacket.getPacketData().length; i++) {
+          receivedByteList.add(tempPacket.getPacketData()[i]);
+        }
+      // }
     }
 
     // Byte to byte ...

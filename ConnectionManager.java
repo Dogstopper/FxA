@@ -22,8 +22,11 @@ public class ConnectionManager {
 	}
 
 	// Return a connection in the connectionList
-	public Connection getConnection(short destination, short source) {
+	public Connection getConnection(RxPPacket packet) {
 		// if connection does not exist create a new connection
+
+		short destination = packet.getDestPort();
+		short source = packet.getSrcPort();
 
 		// Does this connection already exist?
 		for (Connection c : connectionList) {
@@ -39,12 +42,9 @@ public class ConnectionManager {
 		return connection;
 	}
 
-	public Connection updateConnection(RxPPacket packet) {
+	public boolean updateConnection(RxPPacket packet) {
 
-		short destination = packet.getDestPort();
-		short source = packet.getSrcPort();
-
-		Connection c = this.getConnection(destination, source);
+		Connection c = this.getConnection(packet);
 
 		if (!c.isTryingToEstablish()) {
 			
@@ -75,14 +75,71 @@ public class ConnectionManager {
 		// Connection could be entering "Allowed To Send Data" state
 		if (c.isTryingToEstablish() && c.isAboutToEstablish() && c.isEstablished() && !c.isAllowedToSendData()) {
 
-			// Does packet contain JUST an ACK - PSH?
-			if (!packet.isSYN() && packet.isACK() && packet.isPSH() && !packet.isFIN()) {
+			// Does packet contain JUST a SYN - ACK - PSH - FIN?
+			if (packet.isSYN() && packet.isACK() && packet.isPSH() && packet.isFIN()) {
 				c.setAllowedToSendData(true); 
 			}
 		}
 		
-		return c;
+		return packet.isSYN();
 	} 
+
+	public RxPPacket getNextHandshakePacket(Connection c) {
+
+		short src = c.getSource(),
+			  dest = c.getDestination();
+		
+		int seqNum = 0,
+			ackNum = 0;
+		
+		boolean syn = false, 
+				ack = false, 
+				psh = false, 
+				fin = false;
+
+		if (!c.isTryingToEstablish()) {
+			
+			syn = true;
+		}
+
+		// Connection could be entering "About To Establish" state
+		if (c.isTryingToEstablish() && !c.isAboutToEstablish()) {
+
+			syn = true;
+			ack = true;
+		}
+
+		// Connection could be entering "Establish" state
+		if (c.isTryingToEstablish() && c.isAboutToEstablish() && !c.isEstablished()) {
+
+			syn = true;
+			ack = true;
+			psh = true;
+		}
+
+		// Connection could be entering "Allowed To Send Data" state
+		if (c.isTryingToEstablish() && c.isAboutToEstablish() && c.isEstablished() && !c.isAllowedToSendData()) {
+
+			syn = true;
+			ack = true;
+			psh = true;
+			fin = true;
+			System.out.println("Allowed to send data flags");
+		}
+
+		RxPPacket newPacket = new RxPPacket(src,
+                                  dest,
+                                  seqNum,
+                                  ackNum,
+                                  fin,
+                                  syn,
+                                  ack,
+                                  psh);
+
+		newPacket.setChecksum(newPacket.calculateChecksum());
+
+		return newPacket;
+	}
 
 	public List<Connection> getConnectionList() {
 	    return this.connectionList;
