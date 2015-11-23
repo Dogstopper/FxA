@@ -309,8 +309,8 @@ public class RxPSocket {
     for (RxPPacket tempPacket : tempRxPPacketList) {
 
       // getPayload returns an array of bytes, add each byte to the byteList
-      for (int i = 0; i < tempPacket.getPayload().length; i++) {
-        receivedByteList.add(tempPacket.getPayload()[i]);
+      for (int i = 0; i < tempPacket.getPacketData().length; i++) {
+        receivedByteList.add(tempPacket.getPacketData()[i]);
       }
     }
 

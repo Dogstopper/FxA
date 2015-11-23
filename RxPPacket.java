@@ -206,6 +206,15 @@ public class RxPPacket {
     }
   }
 
+  // Return everything that's not the header
+  public byte[] getPacketData() {
+    byte[] payload = getPayload();
+
+    byte[] packetData = Arrays.copyOfRange(payload, PAYLOAD_OFFSET, payload.length);
+
+    return packetData;
+  }
+
   public DatagramPacket asDatagramPacket() {
     return new DatagramPacket(data.array(), data.array().length);
   }
