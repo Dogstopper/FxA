@@ -2,13 +2,12 @@ import java.net.*;
 import java.io.*;
 import java.nio.ByteBuffer;
 
-// Libraries for debugging
+import java.util.List;
+import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.logging.*;
+
 
 public class RxPPacket {
-
-  public static final Logger log = Logger.getLogger(RxPPacket.class.getName());
 
   public static final int DEFAULT_PACKET_SIZE = 200;
 
@@ -179,12 +178,22 @@ public class RxPPacket {
 
   // Retrives the payload data.
   public byte[] getPayload() {
-    byte[] payload = new byte[data.position()];
-    data.flip(); // resets position in buffer to beginning
-    data.get(payload);
 
-    // Log Payload
-    log.logrb(Level.INFO, "RxPPacket", "getPayload()", "byte[] payload", javax.xml.bind.DatatypeConverter.printHexBinary(payload));
+    // Read ByteBuffer into ByteList
+    data.rewind();
+    List<Byte> byteList = new ArrayList<>();
+    while (data.hasRemaining()) {
+      byteList.add(data.get());
+    }
+
+    // Reset Cursor
+    data.position(byteList.size());
+
+    // convert Byte List to byte array
+    byte[] payload = new byte[byteList.size()];
+    for (int i = 0; i < payload.length; i++) {
+      payload[i] = byteList.get(i);
+    }
 
     return payload;
   }

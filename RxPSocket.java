@@ -260,8 +260,13 @@ public class RxPSocket {
       // Receive Datagram from Datagram Socket
       dgSocket.receive(dgPacket);
 
+      System.out.println("dgPacket.getData(): " + javax.xml.bind.DatatypeConverter.printHexBinary(dgPacket.getData()));
+
       // Create RxPPacket from received Datagram Buffer
       RxPPacket receivedRxPPacket = new RxPPacket(dgPacket.getData());
+
+      System.out.println("receivedRxPPacket.getPayload(): " + javax.xml.bind.DatatypeConverter.printHexBinary(receivedRxPPacket.getPayload()));
+
 
       // Keep temporary list of received RxPPackets
       tempRxPPacketList.add(receivedRxPPacket);
@@ -304,8 +309,8 @@ public class RxPSocket {
     for (RxPPacket tempPacket : tempRxPPacketList) {
 
       // getPayload returns an array of bytes, add each byte to the byteList
-      for (Byte payloadByte : tempPacket.getPayload()) {
-        receivedByteList.add(payloadByte);
+      for (int i = 0; i < tempPacket.getPayload().length; i++) {
+        receivedByteList.add(tempPacket.getPayload()[i]);
       }
     }
 

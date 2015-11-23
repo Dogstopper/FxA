@@ -26,6 +26,8 @@ public class FileMsgTextCoder implements MsgCoder {
 	}
 
 	public FileMsg fromWire(byte[] message) throws IOException {
+		System.out.println("fromWire: " + javax.xml.bind.DatatypeConverter.printHexBinary(message));
+		
 		ByteArrayInputStream msgStream = new ByteArrayInputStream(message);
 		Scanner s = new Scanner(new InputStreamReader(msgStream, CHARSETNAME));
 
