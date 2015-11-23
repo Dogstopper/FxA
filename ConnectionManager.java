@@ -3,21 +3,9 @@ import java.util.ArrayList;
 
 public class ConnectionManager {
 
-	private static ConnectionManager connectionManager;
-
 	private List<Connection> connectionList;
 
-	public static ConnectionManager get() {
-
-		if (connectionManager == null) {
-			connectionManager = new ConnectionManager();
-			return connectionManager;
-		} else {
-			return connectionManager;
-		}
-	}
-
-	private ConnectionManager() {
+	public ConnectionManager() {
 		this.connectionList = new ArrayList<>();
 	}
 
