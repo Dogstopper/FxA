@@ -88,31 +88,40 @@ public class ConnectionManager {
 		if (!c.isTryingToEstablish()) {
 			
 			syn = true;
+
+			// This is the beginning of the handshake
+			c.setSourceInitiatedConnection(true);
+
+			System.out.println("TryingToEstablish");
 		}
 
 		// Connection could be entering "About To Establish" state
-		if (c.isTryingToEstablish() && !c.isAboutToEstablish()) {
+		if (!c.sourceInitiatedConnection() && (c.isTryingToEstablish() && !c.isAboutToEstablish())) {
 
 			syn = true;
 			ack = true;
+
+			System.out.println("AboutToEstablish");
 		}
 
 		// Connection could be entering "Establish" state
-		if (c.isTryingToEstablish() && c.isAboutToEstablish() && !c.isEstablished()) {
+		if (c.sourceInitiatedConnection() && (c.isTryingToEstablish() && c.isAboutToEstablish() && !c.isEstablished())) {
 
 			syn = true;
 			ack = true;
 			psh = true;
+
+			System.out.println("Established");
 		}
 
 		// Connection could be entering "Allowed To Send Data" state
-		if (c.isTryingToEstablish() && c.isAboutToEstablish() && c.isEstablished() && !c.isAllowedToSendData()) {
+		if (!c.sourceInitiatedConnection() && (c.isTryingToEstablish() && c.isAboutToEstablish() && c.isEstablished() && !c.isAllowedToSendData())) {
 
 			syn = true;
 			ack = true;
 			psh = true;
 			fin = true;
-			System.out.println("Allowed to send data flags");
+			System.out.println("AllowedToSendData");
 		}
 
 		RxPPacket newPacket = new RxPPacket(src,

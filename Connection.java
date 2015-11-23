@@ -3,6 +3,8 @@ public class Connection {
 	private short destination;
 	private short source;
 
+	private boolean sourceInitiatedConnection; // True if Host Initiated Connection
+
 	private boolean isTryingToEstablish;
 	private boolean isAboutToEstablish;
 	private boolean isEstablished;
@@ -12,6 +14,8 @@ public class Connection {
 
 		this.destination = destination;
 		this.source = source;
+
+		this.sourceInitiatedConnection = false;
 
 		this.isTryingToEstablish = false;
 		this.isAboutToEstablish = false;
@@ -31,6 +35,10 @@ public class Connection {
 	}
 
 	/* Setters and Getters */
+
+	public boolean sourceInitiatedConnection() {
+	    return this.sourceInitiatedConnection;
+	}
 
 	public short getDestination() {
 	    return this.destination;
@@ -54,6 +62,10 @@ public class Connection {
 
 	public boolean isAllowedToSendData() {
 	    return this.isAllowedToSendData;
+	}
+
+	public void setSourceInitiatedConnection(boolean sourceInitiatedConnection) {
+	    this.sourceInitiatedConnection = sourceInitiatedConnection;
 	}
 
 	public void setDestination(short destination) {

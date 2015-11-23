@@ -97,16 +97,16 @@ public class RxPSocket {
       } else {
 
         // Handshake Packet
-        RxPPacket packet = connectionManager.getNextHandshakePacket(connection);
+        RxPPacket handshakePacket = connectionManager.getNextHandshakePacket(connection);
 
         // Get RxPPacket Handshake Packet
-        DatagramPacket dg = packet.asDatagramPacket();
+        DatagramPacket dg = handshakePacket.asDatagramPacket();
 
         try {
 
           // Send Handshake Packet
           dgSocket.send(dg);
-          connectionManager.updateConnection(packet);
+          connectionManager.updateConnection(handshakePacket);
 
         } catch (IOException e) {
           System.out.println("Handshake Packet did not send");
@@ -175,15 +175,32 @@ public class RxPSocket {
 
     // TODO: 2) Set Window Size
     byte[] packetPayload = new byte[RxPPacket.DEFAULT_PACKET_SIZE];
-    DatagramPacket packet = new DatagramPacket(packetPayload, packetPayload.length);
+    DatagramPacket dgPacket = new DatagramPacket(packetPayload, packetPayload.length);
 
     while (oldestUnackedPointer != packetBuffer.length) {
       try {
         // Wait for the ACK
-        dgSocket.receive(packet);
-        RxPPacket rxpPacket = new RxPPacket(packet);
+        dgSocket.receive(dgPacket);
+        RxPPacket rxpPacket = new RxPPacket(dgPacket);
 
-        if (rxpPacket.isACK()) {
+        // Check if rxpPacket is related to handshake
+        if (connectionManager.updateConnection(rxpPacket)) {
+
+          Connection connection = connectionManager.getConnection(rxpPacket);
+          RxPPacket handshakePacket = connectionManager.getNextHandshakePacket(connection);
+
+          // Send handshake packet as datagram
+          DatagramPacket dg = handshakePacket.asDatagramPacket();
+          dg.setAddress(dgPacket.getAddress());
+          dg.setPort(dgPacket.getPort());
+          dgSocket.send(dg);
+
+          connectionManager.updateConnection(handshakePacket);
+
+          System.out.println("ACKING Handshake Response: " + connectionManager.getConnection(handshakePacket).connectionStateToString());
+
+        } else if (!rxpPacket.isSYN() && rxpPacket.isACK()) {
+
           int ackNumber = rxpPacket.getACKNum();
           System.out.println("ACK Received: " + ackNumber);
 
@@ -240,6 +257,8 @@ public class RxPSocket {
           dg.setAddress(dgPacket.getAddress());
           dg.setPort(dgPacket.getPort());
           dgSocket.send(dg);
+
+          connectionManager.updateConnection(handshakePacket);
 
           System.out.println("Sending Handshake Response: " + connectionManager.getConnection(handshakePacket).connectionStateToString());
 
