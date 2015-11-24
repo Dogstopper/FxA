@@ -103,6 +103,10 @@ public class ConnectionManager {
 				psh = false, 
 				fin = false;
 
+		if (c.sourceInitiatedConnection() && (c.isTryingToEstablish() && c.isAboutToEstablish() && c.isEstablished())) {
+			return null;
+		}
+
 		if (!c.isTryingToEstablish()) {
 			
 			syn = true;

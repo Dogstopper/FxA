@@ -19,9 +19,9 @@ public class FxAServer {
     MsgCoder coder = new FileMsgTextCoder();
     FileService service = new FileService();
 
-    while (true) {
+    socket.listen();
 
-      socket.listen();
+    while (true) {
 
       // Receive Buffer
       byte[] inBuffer = socket.receive();
