@@ -9,6 +9,7 @@ public class Connection {
 	private boolean isAboutToEstablish;
 	private boolean isEstablished;
 	private boolean isAllowedToSendData;
+	private boolean isSendingData;
 
 	public Connection(short destination, short source) {
 
@@ -21,6 +22,7 @@ public class Connection {
 		this.isAboutToEstablish = false;
 		this.isEstablished = false;
 		this.isAllowedToSendData = false;
+		this.isSendingData = false;
 	}
 
 	public String connectionStateToString() {
@@ -29,7 +31,8 @@ public class Connection {
 					+ "\nisTryingToEstablish: " + (this.isTryingToEstablish ? "1" : "0")
 					+ "\nisAboutToEstablish: " + (this.isAboutToEstablish ? "1" : "0")
 					+ "\nisEstablished: " + (this.isEstablished ? "1" : "0")
-					+ "\nisAllowedToSendData: " + (this.isAllowedToSendData ? "1" : "0");
+					+ "\nisAllowedToSendData: " + (this.isAllowedToSendData ? "1" : "0")
+					+ "\nisSendingData: " + (this.isSendingData ? "1" : "0");
 
 		return state;
 	}
@@ -64,6 +67,10 @@ public class Connection {
 	    return this.isAllowedToSendData;
 	}
 
+	public boolean isSendingData() {
+	    return this.isSendingData;
+	}
+
 	public void setSourceInitiatedConnection(boolean sourceInitiatedConnection) {
 	    this.sourceInitiatedConnection = sourceInitiatedConnection;
 	}
@@ -90,5 +97,9 @@ public class Connection {
 
 	public void setAllowedToSendData(boolean isAllowedToSendData) {
 	    this.isAllowedToSendData = isAllowedToSendData;
+	}
+
+	public void setSendingData(boolean isSendingData) {
+	    this.isSendingData = isSendingData;
 	}
 }

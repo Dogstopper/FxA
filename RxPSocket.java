@@ -62,7 +62,7 @@ public class RxPSocket {
 
     // Listen for next handshake packet
     try {
-      this.handshake();
+      this.handshake("Client", dest, src);
     } catch (IOException e) {
       System.out.println("Could not receive handshake packet");
     }
@@ -72,23 +72,54 @@ public class RxPSocket {
 
     DatagramPacket dgPacket = new DatagramPacket(new byte[MAX_PACKET_SIZE], MAX_PACKET_SIZE);
 
-    try 
-    {
-      this.handshake();
+    try {
+      this.handshake("Server", (short) 0, (short) 0);
     } catch (IOException ioe) {
       System.out.println("Handshake Packet IOException");
     }
   }
 
-  public void handshake() throws IOException {
+  public void handshake(String hostType, short dest, short src) throws IOException {
 
     DatagramPacket dgPacket = new DatagramPacket(new byte[MAX_PACKET_SIZE], MAX_PACKET_SIZE);
 
+    Connection serverConnection = null;
     boolean allowedToSendData = false;
-    while (!allowedToSendData) {
+    boolean sendingData = false;
+
+    // Used to resend lost handshake packets
+    Timer timer = new Timer();
+    int timeoutMillis = 300;
+
+    while (!sendingData) {
+
+      // if (hostType.equals("Client")) {
+      //   Connection connection = connectionManager.getConnection(dest, src);
+
+      //   // Resend the current data every 300ms there is not an ACKed packet.
+      //   RxPPacket[] resendBuffer = new RxPPacket[] { connectionManager.getLastHandshakePacket(connection) };
+      //   ResendTimerTask resendTask = new ResendTimerTask(oldestUnackedPointer, windowSize, resendBuffer);
+      //   timer.scheduleAtFixedRate(resendTask, 0, timeoutMillis);
+      // } else if (hostType.equals("Server")) {
+
+      //   // The server has to have received at least one packet in order to resend handshake packets
+      //   if (serverConnection != null) {
+          
+      //     // Resend the current data every 300ms there is not an ACKed packet.
+      //     RxPPacket[] resendBuffer = new RxPPacket[] { connectionManager.getLastHandshakePacket(serverConnection) };
+      //     ResendTimerTask resendTask = new ResendTimerTask(oldestUnackedPointer, windowSize, resendBuffer);
+      //     timer.scheduleAtFixedRate(resendTask, 0, timeoutMillis);
+      //   }
+      // }
+
       dgSocket.receive(dgPacket);
 
       RxPPacket receivedRxPPacket = new RxPPacket(dgPacket.getData());
+
+      // Initialize servers connection after first packet is received
+      if (hostType.equals("Server") && serverConnection == null) {
+        serverConnection = connectionManager.getConnection(receivedRxPPacket);
+      }
 
       // Check the checksum to make sure no corruption occurred
       long checksum = receivedRxPPacket.getChecksum();
@@ -118,11 +149,16 @@ public class RxPSocket {
 
           // Update while loop condition
           allowedToSendData = connection.isAllowedToSendData();
+          sendingData = connection.isSendingData();
         }
       } else {
         System.out.println("Handshake Packet Corrupted");
       }
+
+      
     }
+    // do this on successful receive
+    timer.cancel();
   }
 
   private class ResendTimerTask extends TimerTask {
@@ -158,21 +194,18 @@ public class RxPSocket {
 
       Connection connection = connectionManager.getConnection(sendBuffer[0]);
 
-      if (connection.isAllowedToSendData()) {
+      System.out.println("Resending " + Math.min(windowSize, sendBuffer.length-oldestUnackedPointer) + " packets");
+      numTimesSilent++;
 
-        System.out.println("Resending " + windowSize + " packets");
-        numTimesSilent++;
-
-        // Send all unsent packets
-        for (int i = 0; i < windowSize && i < sendBuffer.length-oldestUnackedPointer; i++) {
-          try {
-            DatagramPacket dg = sendBuffer[i+oldestUnackedPointer].asDatagramPacket();
-            dg.setAddress(dgSocket.getInetAddress());
-            dg.setPort(dgSocket.getPort());
-            dgSocket.send(dg);
-          } catch(IOException e) {
-            // ACtually do not care. Timer will requeue these.
-          }
+      // Send all unsent packets
+      for (int i = 0; i < windowSize && i < sendBuffer.length-oldestUnackedPointer; i++) {
+        try {
+          DatagramPacket dg = sendBuffer[i+oldestUnackedPointer].asDatagramPacket();
+          dg.setAddress(dgSocket.getInetAddress());
+          dg.setPort(dgSocket.getPort());
+          dgSocket.send(dg);
+        } catch(IOException e) {
+          // ACtually do not care. Timer will requeue these.
         }
       }
     }
