@@ -37,8 +37,8 @@ public class FxAServer {
         // Send response (byte[]) from handledRequest
         byte[] bytesToSend = coder.toWire(msg);
         System.out.println("Sending response (" + bytesToSend.length + " bytes):");
-        System.out.println(msg);
-        socket.send(bytesToSend);
+        System.out.println(msg.getFilename());
+        //socket.send(bytesToSend);
       } catch (IOException ioe) {
         System.err.println("Parse error in message: " + ioe.getMessage());
       }

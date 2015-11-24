@@ -16,7 +16,7 @@ public class RxPPacket {
 
   public RxPPacket(byte[] buf) {
     //System.out.println("Received Buffer: " + javax.xml.bind.DatatypeConverter.printHexBinary(buf));
-    byte[] dataBytes = Arrays.copyOfRange(buf, 0, DEFAULT_PACKET_SIZE+20);
+    byte[] dataBytes = Arrays.copyOfRange(buf, 0, DEFAULT_PACKET_SIZE+28);
     System.out.println("Received Data: " + javax.xml.bind.DatatypeConverter.printHexBinary(dataBytes));
 
     this.data = ByteBuffer.wrap(dataBytes);
@@ -29,13 +29,13 @@ public class RxPPacket {
   }
 
   public RxPPacket() {
-    this.data = ByteBuffer.allocate(DEFAULT_PACKET_SIZE + 20);
+    this.data = ByteBuffer.allocate(DEFAULT_PACKET_SIZE + 28);
     //this.packet = new DatagramPacket(this.data.array(), DEFAULT_PACKET_SIZE);
   }
 
   // TODO: correctly put all attributes in buffer...
   public RxPPacket(short src, short dest, int seq, int ackNum, boolean fin, boolean syn, boolean ack, boolean psh) {
-    this.data = ByteBuffer.allocate(DEFAULT_PACKET_SIZE + 20);
+    this.data = ByteBuffer.allocate(DEFAULT_PACKET_SIZE + 28);
     this.setSrcPort(src);
     this.setDestPort(dest);
     this.setSeqNum(seq);
@@ -53,8 +53,8 @@ public class RxPPacket {
   public static final int ACK_NUMBER_OFFSET = 8;
   public static final int FLAGS_BYTE_OFFSET = 13;
   public static final int WINDOW_SIZE_OFFSET = 15;
-  public static final int CHECKSUM_OFFSET = DEFAULT_PACKET_SIZE;
   public static final int PAYLOAD_OFFSET = 20;
+  public static final int CHECKSUM_OFFSET = DEFAULT_PACKET_SIZE+PAYLOAD_OFFSET;
 
   public static final byte FIN_MASK = 0b00000001;
   public static final byte SYN_MASK = 0b00000010;
@@ -173,7 +173,7 @@ public class RxPPacket {
   }
 
   public long calculateChecksum() {
-    byte[] buf = Arrays.copyOfRange(data.array(), 0, DEFAULT_PACKET_SIZE);
+    byte[] buf = Arrays.copyOfRange(data.array(), 0, CHECKSUM_OFFSET);
     CRC32 hasher = new CRC32();
     hasher.update(buf);
     return hasher.getValue();
@@ -209,7 +209,7 @@ public class RxPPacket {
   // Sets the payload data
   public void setPayload(byte[] buf) {
 
-    for (int i = 0; i < buf.length; i++) {
+    for (int i = 0; i < buf.length && i < CHECKSUM_OFFSET; i++) {
       data.put(i + PAYLOAD_OFFSET, buf[i]);
     }
   }
@@ -218,7 +218,7 @@ public class RxPPacket {
   public byte[] getPacketData() {
     byte[] payload = getPayload();
 
-    byte[] packetData = Arrays.copyOfRange(payload, PAYLOAD_OFFSET, DEFAULT_PACKET_SIZE);
+    byte[] packetData = Arrays.copyOfRange(payload, PAYLOAD_OFFSET, CHECKSUM_OFFSET);
 
     return packetData;
   }

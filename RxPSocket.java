@@ -217,12 +217,15 @@ public class RxPSocket {
       newPacket.setChecksum(newPacket.calculateChecksum());
 
       packetBuffer[i] = newPacket;
-
-      System.out.println("Packet " + i + ": " + javax.xml.bind.DatatypeConverter.printHexBinary(newPacket.getPayload()));
     }
 
-    // Add PSH flag
-    //packetBuffer[packetBuffer.length - 1].setPSH(true);
+    // Debugging to check that the packetizing works
+    // StringBuffer buffer = new StringBuffer();
+    // for (RxPPacket packet : packetBuffer) {
+    //   String string = new String(packet.getPacketData());
+    //   buffer.append(string);
+    // }
+    // System.out.println("\n\nPacketized: " + buffer + "\n\n");
 
     // The timer task is charged with resending all packets in the window
     // every time it is fired. It needs to be encapsulated in a class because
@@ -287,6 +290,7 @@ public class RxPSocket {
 
   // TODO: receive packet
   // TODO: receive length?
+  private int expectedSeqNum = -1; // Initial Number
   public byte[] receive() throws IOException {
 
     boolean PSH_ACKsent = false;
@@ -315,21 +319,28 @@ public class RxPSocket {
         }
       }
 
-      //System.out.println("dgPacket.getData(): " + javax.xml.bind.DatatypeConverter.printHexBinary(dgPacket.getData()));
-
       // Create RxPPacket from received Datagram Buffer
       RxPPacket receivedRxPPacket = new RxPPacket(dgPacket.getData());
-
-      //System.out.println("receivedRxPPacket.getPayload(): " + javax.xml.bind.DatatypeConverter.printHexBinary(receivedRxPPacket.getPayload()));
 
       // Check the checksum to make sure no corruption occurred
       long checksum = receivedRxPPacket.getChecksum();
       long currentChecksum = receivedRxPPacket.calculateChecksum();
+
+      System.out.println("Expected: " + expectedSeqNum + "\tReceived: " + receivedRxPPacket.getSeqNum());
+
       if (currentChecksum != checksum) {
         System.out.println("Packet Corrupted");
       }
+      else if (expectedSeqNum < receivedRxPPacket.getSeqNum() &&
+               expectedSeqNum != -1) {
+        System.out.println("Packet Out of Order");
+      }
       else {
         tempRxPPacketList.add(receivedRxPPacket);
+        if (expectedSeqNum == -1) {
+          expectedSeqNum = receivedRxPPacket.getSeqNum();
+        }
+        expectedSeqNum = receivedRxPPacket.getSeqNum() + 1;
 
         // Make an ACK
         RxPPacket ackRxPPacket = new RxPPacket();
@@ -388,17 +399,5 @@ public class RxPSocket {
     }
 
     return receivedBytes;
-  }
-
-  // TODO: Check if corrupted via checksum
-  public static boolean isCorrupt(RxPPacket rxpPacket) {
-    return false;
-  }
-
-  // TODO: Check if packet is out of order
-  public static boolean isOutOfOrder(RxPPacket rxpPacket, int expectedSeqNum) {
-
-    // Expected sequence number is last packet number + 1
-    return false;
   }
 }
