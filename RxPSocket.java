@@ -93,7 +93,7 @@ public class RxPSocket {
     DatagramPacket dgPacket = new DatagramPacket(new byte[MAX_PACKET_SIZE], MAX_PACKET_SIZE);
     
     boolean allowedToSendData = false;
-    while (allowedToSendData) {
+    while (!allowedToSendData) {
 
       try 
       {
@@ -106,7 +106,7 @@ public class RxPSocket {
         long checksum = receivedRxPPacket.getChecksum();
         long currentChecksum = receivedRxPPacket.calculateChecksum();
         
-        if (currentChecksum == checksum) {
+        if (true) { // (currentChecksum == checksum) {
   
           // If it's a handshake packet, send the next handshake packet
           if (connectionManager.updateConnection(receivedRxPPacket)) {
@@ -309,27 +309,46 @@ public class RxPSocket {
       }
       else {
 
-        // Add to PacketList that gets passed up to Application
-        tempRxPPacketList.add(receivedRxPPacket);
+        // If it's a handshake packet, send the next handshake packet
+        if (connectionManager.updateConnection(receivedRxPPacket)) {
 
-        // Make an ACK
-        RxPPacket ackRxPPacket = new RxPPacket();
-        ackRxPPacket.setACK(true);
-        ackRxPPacket.setACKNum(receivedRxPPacket.getSeqNum());
-        ackRxPPacket.setDestPort((short)dgPacket.getPort());
-        ackRxPPacket.setSrcPort((short)dgSocket.getLocalPort());
+          Connection connection = connectionManager.getConnection(receivedRxPPacket);
+          RxPPacket handshakePacket = connectionManager.getNextHandshakePacket(connection);
 
-        // Send ACK
-        DatagramPacket dg = ackRxPPacket.asDatagramPacket();
-        dg.setAddress(dgPacket.getAddress());
-        dg.setPort(dgPacket.getPort());
-        dgSocket.send(dg);
+          // Send handshake packet as datagram
+          DatagramPacket dg = handshakePacket.asDatagramPacket();
+          dg.setAddress(dgPacket.getAddress());
+          dg.setPort(dgPacket.getPort());
+          dgSocket.send(dg);
 
-        System.out.println("Sending ACK: " + ackRxPPacket.getACKNum());
+          connectionManager.updateConnection(handshakePacket);
 
-        if (receivedRxPPacket.isPSH()) {
-          // Make sure the last ACK is received
-          break;
+          System.out.println("Sending Handshake Response: " + connectionManager.getConnection(handshakePacket).connectionStateToString());
+
+        } else { // Otherwise send ACK
+
+          // Add to PacketList that gets passed up to Application
+          tempRxPPacketList.add(receivedRxPPacket);
+
+          // Make an ACK
+          RxPPacket ackRxPPacket = new RxPPacket();
+          ackRxPPacket.setACK(true);
+          ackRxPPacket.setACKNum(receivedRxPPacket.getSeqNum());
+          ackRxPPacket.setDestPort((short)dgPacket.getPort());
+          ackRxPPacket.setSrcPort((short)dgSocket.getLocalPort());
+
+          // Send ACK
+          DatagramPacket dg = ackRxPPacket.asDatagramPacket();
+          dg.setAddress(dgPacket.getAddress());
+          dg.setPort(dgPacket.getPort());
+          dgSocket.send(dg);
+
+          System.out.println("Sending ACK: " + ackRxPPacket.getACKNum());
+
+          if (receivedRxPPacket.isPSH()) {
+            // Make sure the last ACK is received
+            break;
+          }
         }
       }
     }
