@@ -21,8 +21,6 @@ public class RxPSocket {
 
   // Private variables used in several states
   private DatagramSocket dgSocket;
-  private State currentState;
-  private Event event;
   private int oldestUnackedPointer; // oldest unACKed pointer
   private int windowSize = 5; // Stop and Wait length
 
@@ -32,101 +30,117 @@ public class RxPSocket {
   private InetAddress acceptedAddress;
   ///private int acceptedPort;
 
+  private ConnectionManager connectionManager;
+
   // TODO: Add a timer for timeouts.
 
   public RxPSocket()
       throws SocketException {
     dgSocket = new DatagramSocket();
-    currentState = State.CLOSED;
+    connectionManager = new ConnectionManager();
   }
 
   public RxPSocket(int port)
       throws SocketException {
     dgSocket = new DatagramSocket(port);
-    currentState = State.CLOSED;
+    connectionManager = new ConnectionManager();
 	}
 
 	public RxPSocket(int port, InetAddress address)
       throws SocketException {
     dgSocket = new DatagramSocket(port, address);
-    currentState = State.CLOSED;
+    connectionManager = new ConnectionManager();
 	}
-
-  // Moves the state from one to another if an event
-  // is accepted in that state.
-  private boolean stateMachineTransition() {
-    try {
-      switch (this.currentState) {
-        case CLOSED:
-          if (this.event == Event.LISTEN) {
-            System.out.println("Moving from CLOSED to LISTEN");
-            this.currentState = State.LISTEN;
-          }
-          else if (this.event == Event.CONNECT) {
-            System.out.println("Moving from CLOSED to SYN_SENT");
-            this.currentState = State.SYN_SENT;
-          }
-          break;
-
-        case LISTEN:
-          break;
-          // Implement
-
-        default:
-          // Check for timeout.
-          break;
-      }
-    } catch(Exception e) {
-      // TODO: Error Handling
-    }
-    return true;
-  }
-
-  // Implement the state behavior. It's consolidated in the switch
-  // so that when timeouts occur, it's trivial to repeat a state
-  private void stateMachineAction() {
-    try {
-      switch (this.currentState) {
-        case CLOSED:
-          break;
-        case LISTEN:
-          handleListen();
-          break;
-      }
-    } catch(Exception e) {
-      // Handle this crap
-    }
-  }
-
-  private void handleListen() throws IOException {
-    // We need to allocate space for the buffers
-    if (currentState == State.CLOSED) {
-      byte[] inBuffer = new byte[MAX_PACKET_SIZE];
-      byte[] outBuffer = new byte[MAX_PACKET_SIZE];
-
-      // Accept a new client
-      // TODO: 4 way handshake
-      while (true) { // Loop until we get a SYN packet.
-        DatagramPacket packet = new DatagramPacket(inBuffer, inBuffer.length);
-        dgSocket.receive(packet);
-
-        RxPPacket rxpPacket = new RxPPacket(packet);
-        if (rxpPacket.isSYN()) {
-          break;
-        }
-      }
-    }
-  }
-  // Triggers a change into the LISTEN state.
-  public void listen()
-      throws IOException {
-        event = Event.LISTEN;
-        stateMachineTransition();
-  }
 
   /* Connect, Send, and Receive Methods */
   public void connect(InetAddress address, int port) {
     dgSocket.connect(address, port);
+
+    // Initiate handshake
+    short src = (short) dgSocket.getLocalPort();
+    short dest = (short) dgSocket.getPort();
+
+    Connection connection = connectionManager.getConnection(dest, src);
+
+    // Handshake Packet
+    RxPPacket handshakePacket = connectionManager.getNextHandshakePacket(connection);
+    
+    try {
+      DatagramPacket dg = handshakePacket.asDatagramPacket();
+
+      // Send Handshake Packet
+      dgSocket.send(dg);
+      connectionManager.updateConnection(handshakePacket);
+
+    } catch (IOException e) {
+      System.out.println("Handshake Packet did not send");
+    }
+
+    // Listen for next handshake packet
+    try {
+      this.handshake();
+    } catch (IOException e) {
+      System.out.println("Could not receive handshake packet");
+    }
+  }
+
+  public void listen() {
+
+    DatagramPacket dgPacket = new DatagramPacket(new byte[MAX_PACKET_SIZE], MAX_PACKET_SIZE);
+
+    try 
+    {
+      this.handshake();
+    } catch (IOException ioe) {
+      System.out.println("Handshake Packet IOException");
+    }
+  }
+
+  public void handshake() throws IOException {
+
+    DatagramPacket dgPacket = new DatagramPacket(new byte[MAX_PACKET_SIZE], MAX_PACKET_SIZE);
+
+    boolean allowedToSendData = false;
+    while (!allowedToSendData) {
+      dgSocket.receive(dgPacket);
+
+      RxPPacket receivedRxPPacket = new RxPPacket(dgPacket.getData());
+
+      // Check the checksum to make sure no corruption occurred
+      long checksum = receivedRxPPacket.getChecksum();
+      long currentChecksum = receivedRxPPacket.calculateChecksum();
+      if (currentChecksum == checksum) {
+
+        // If it's a handshake packet, send the next handshake packet
+        if (connectionManager.updateConnection(receivedRxPPacket)) {
+
+          System.out.println("Received Handshake Request: " + connectionManager.getConnection(receivedRxPPacket).connectionStateToString());
+
+          Connection connection = connectionManager.getConnection(receivedRxPPacket);
+          RxPPacket handshakePacket = connectionManager.getNextHandshakePacket(connection);
+
+          if (handshakePacket != null) { 
+            
+            connectionManager.updateConnection(handshakePacket);
+  
+            // Send handshake packet as datagram
+            // if (!connectionManager.getConnection(receivedRxPPacket).isAllowedToSendData()) {
+              DatagramPacket dg = handshakePacket.asDatagramPacket();
+              dg.setAddress(dgPacket.getAddress());
+              dg.setPort(dgPacket.getPort());
+              dgSocket.send(dg);
+            // }
+            
+            System.out.println("Sending Handshake Response: " + connectionManager.getConnection(handshakePacket).connectionStateToString());
+          }
+
+          // Update while loop condition
+          allowedToSendData = connection.isAllowedToSendData();
+        }
+      } else {
+        System.out.println("Handshake Packet Corrupted");
+      }
+    }
   }
 
   private class ResendTimerTask extends TimerTask {
@@ -159,18 +173,24 @@ public class RxPSocket {
     }
 
     public void run() {
-      System.out.println("Resending " + windowSize + " packets");
-      numTimesSilent++;
 
-      // Send all unsent packets
-      for (int i = 0; i < windowSize && i < sendBuffer.length-oldestUnackedPointer; i++) {
-        try {
-          DatagramPacket dg = sendBuffer[i+oldestUnackedPointer].asDatagramPacket();
-          dg.setAddress(dgSocket.getInetAddress());
-          dg.setPort(dgSocket.getPort());
-          dgSocket.send(dg);
-        } catch(IOException e) {
-          // ACtually do not care. Timer will requeue these.
+      Connection connection = connectionManager.getConnection(sendBuffer[0]);
+
+      if (connection.isAllowedToSendData()) {
+
+        System.out.println("Resending " + windowSize + " packets");
+        numTimesSilent++;
+
+        // Send all unsent packets
+        for (int i = 0; i < windowSize && i < sendBuffer.length-oldestUnackedPointer; i++) {
+          try {
+            DatagramPacket dg = sendBuffer[i+oldestUnackedPointer].asDatagramPacket();
+            dg.setAddress(dgSocket.getInetAddress());
+            dg.setPort(dgSocket.getPort());
+            dgSocket.send(dg);
+          } catch(IOException e) {
+            // ACtually do not care. Timer will requeue these.
+          }
         }
       }
     }
@@ -238,13 +258,13 @@ public class RxPSocket {
 
     // TODO: 2) Set Window Size
     byte[] packetPayload = new byte[RxPPacket.DEFAULT_PACKET_SIZE];
-    DatagramPacket packet = new DatagramPacket(packetPayload, packetPayload.length);
+    DatagramPacket dgPacket = new DatagramPacket(packetPayload, packetPayload.length);
 
     while (oldestUnackedPointer != packetBuffer.length) {
       try {
         // Wait for the ACK
-        dgSocket.receive(packet);
-        RxPPacket rxpPacket = new RxPPacket(packet);
+        dgSocket.receive(dgPacket);
+        RxPPacket rxpPacket = new RxPPacket(dgPacket);
 
         // After 15 seconds of NO response, say that the server is offline
         if (resendTask.getNumTimesNoResponse() == 50) {
@@ -252,7 +272,8 @@ public class RxPSocket {
           break;
         }
 
-        if (rxpPacket.isACK()) {
+        if (!rxpPacket.isSYN() && rxpPacket.isACK()) {
+
           int ackNumber = rxpPacket.getACKNum();
           System.out.println("ACK Received: " + ackNumber);
 
@@ -272,15 +293,15 @@ public class RxPSocket {
             // If the received packet is a PSH+ACK, then send a PSH+ACK and quit.
             RxPPacket ackRxPPacket = new RxPPacket();
             ackRxPPacket.setACK(true);
-            ackRxPPacket.setDestPort((short)packet.getPort());
+            ackRxPPacket.setDestPort((short)dgPacket.getPort());
             ackRxPPacket.setSrcPort((short)dgSocket.getLocalPort());
             ackRxPPacket.setPSH(true);
             ackRxPPacket.setChecksum(ackRxPPacket.calculateChecksum());
 
             // Send ACK+PSH
             DatagramPacket dg = ackRxPPacket.asDatagramPacket();
-            dg.setAddress(packet.getAddress());
-            dg.setPort(packet.getPort());
+            dg.setAddress(dgPacket.getAddress());
+            dg.setPort(dgPacket.getPort());
             dgSocket.send(dg);
             System.out.println("Sending PSH+ACK");
           }
@@ -336,36 +357,58 @@ public class RxPSocket {
         System.out.println("Packet Corrupted");
       }
       else {
-        // Only add to the list if this is the right packet. ACK any other one.
-        if (expectedSeqNum == receivedRxPPacket.getSeqNum()) {
-          tempRxPPacketList.add(receivedRxPPacket);
-          expectedSeqNum = receivedRxPPacket.getSeqNum() + 1;
-        }
-        else {
-          System.out.println("Packet Out of Order");
-        }
 
-        // Make an ACK
-        RxPPacket ackRxPPacket = new RxPPacket();
-        ackRxPPacket.setACK(true);
-        ackRxPPacket.setACKNum(receivedRxPPacket.getSeqNum());
-        ackRxPPacket.setDestPort((short)dgPacket.getPort());
-        ackRxPPacket.setSrcPort((short)dgSocket.getLocalPort());
-        if (receivedRxPPacket.isPSH()) {
-          ackRxPPacket.setPSH(true);
-          PSH_ACKsent = true;
-        }
-        ackRxPPacket.setChecksum(ackRxPPacket.calculateChecksum());
+        // If it's a handshake packet, send the next handshake packet
+        if (connectionManager.updateConnection(receivedRxPPacket)) {
 
-        // Send ACK
-        DatagramPacket dg = ackRxPPacket.asDatagramPacket();
-        dg.setAddress(dgPacket.getAddress());
-        dg.setPort(dgPacket.getPort());
-        dgSocket.send(dg);
+          Connection connection = connectionManager.getConnection(receivedRxPPacket);
+          RxPPacket handshakePacket = connectionManager.getNextHandshakePacket(connection);
 
-        System.out.println("Sending ACK: " + ackRxPPacket.getACKNum());
-        if (receivedRxPPacket.isACK() && receivedRxPPacket.isPSH()) {
-          break;
+          // Send handshake packet as datagram
+          DatagramPacket dg = handshakePacket.asDatagramPacket();
+          dg.setAddress(dgPacket.getAddress());
+          dg.setPort(dgPacket.getPort());
+          dgSocket.send(dg);
+
+          connectionManager.updateConnection(handshakePacket);
+
+          System.out.println("Sending Handshake Response: " + connectionManager.getConnection(handshakePacket).connectionStateToString());
+
+        } else { // Otherwise send ACK
+
+          // Only add to the list if this is the right packet. ACK any other one.
+          if (expectedSeqNum == receivedRxPPacket.getSeqNum()) {
+            tempRxPPacketList.add(receivedRxPPacket);
+            expectedSeqNum = receivedRxPPacket.getSeqNum() + 1;
+          }
+          else {
+            System.out.println("Packet Out of Order");
+          }
+
+          // Make an ACK
+          RxPPacket ackRxPPacket = new RxPPacket();
+          ackRxPPacket.setACK(true);
+          ackRxPPacket.setACKNum(receivedRxPPacket.getSeqNum());
+          ackRxPPacket.setDestPort((short)dgPacket.getPort());
+          ackRxPPacket.setSrcPort((short)dgSocket.getLocalPort());
+          if (receivedRxPPacket.isPSH()) {
+            ackRxPPacket.setPSH(true);
+            PSH_ACKsent = true;
+          }
+          ackRxPPacket.setChecksum(ackRxPPacket.calculateChecksum());
+
+          // Send ACK
+          DatagramPacket dg = ackRxPPacket.asDatagramPacket();
+          dg.setAddress(dgPacket.getAddress());
+          dg.setPort(dgPacket.getPort());
+          dgSocket.send(dg);
+
+          System.out.println("Sending ACK: " + ackRxPPacket.getACKNum());
+
+          if (receivedRxPPacket.isACK() && receivedRxPPacket.isPSH()) {
+            // Make sure the last ACK is received
+            break;
+          }
         }
       }
     }
@@ -388,7 +431,7 @@ public class RxPSocket {
     // give the application a byte buffer
     List<Byte> receivedByteList = new ArrayList<>();
     for (RxPPacket tempPacket : tempRxPPacketList) {
-
+        
       // getPayload returns an array of bytes, add each byte to the byteList
       for (int i = 0; i < tempPacket.getPacketData().length; i++) {
         receivedByteList.add(tempPacket.getPacketData()[i]);
