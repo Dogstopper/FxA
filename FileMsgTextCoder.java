@@ -26,7 +26,7 @@ public class FileMsgTextCoder implements MsgCoder {
 		return data;
 	}
 
-	public FileMsg fromWire(byte[] message) throws IOException {		
+	public FileMsg fromWire(byte[] message) throws IOException {
 		ByteArrayInputStream msgStream = new ByteArrayInputStream(message);
 		Scanner s = new Scanner(new InputStreamReader(msgStream, CHARSETNAME));
 
@@ -50,8 +50,13 @@ public class FileMsgTextCoder implements MsgCoder {
 				throw new IOException("Bad GET/POST indicator: " + token);
 			}
 
-			token = s.next();
-			filename = token;
+      StringBuffer buffer = new StringBuffer();
+      while(s.hasNextLine()) {
+        token = s.nextLine();
+  			buffer.append(token + "\n");
+      }
+      filename = buffer.toString();
+
 		} catch (IOException ioe) {
 			throw new IOException("Parse error...");
 		}
