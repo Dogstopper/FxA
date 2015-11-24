@@ -6,29 +6,13 @@ public class RxPSocket {
 
   public static final int MAX_PACKET_SIZE = 2000;
 
-  // States that we could be in
-  private enum State {
-      CLOSED, SYN_SENT, SYN_REC, LISTEN, ESTABLISHED,
-      FIN_WAIT_1, FIN_WAIT_2, CLOSING, CLOSE_WAIT,
-      TIMED_WAIT, LAST_ACK
-  }
-
-  // Events that occur to move between states.
-  private enum Event {
-    SYN, LISTEN, CONNECT, SEND, CLOSE, ACK, SYNACK,
-    FIN, TIMEOUT
-  }
-
   // Private variables used in several states
   private DatagramSocket dgSocket;
   private int oldestUnackedPointer; // oldest unACKed pointer
   private int windowSize = 5; // Stop and Wait length
 
   // Variables that are set in the LISTEN/ACCEPT phases.
-  // private byte[] inBuffer;
-  // private byte[] outBuffer;
   private InetAddress acceptedAddress;
-  ///private int acceptedPort;
 
   private ConnectionManager connectionManager;
 
@@ -237,14 +221,6 @@ public class RxPSocket {
       packetBuffer[i] = newPacket;
     }
 
-    // Debugging to check that the packetizing works
-    // StringBuffer buffer = new StringBuffer();
-    // for (RxPPacket packet : packetBuffer) {
-    //   String string = new String(packet.getPacketData());
-    //   buffer.append(string);
-    // }
-    // System.out.println("\n\nPacketized: " + buffer + "\n\n");
-
     // The timer task is charged with resending all packets in the window
     // every time it is fired. It needs to be encapsulated in a class because
     // Async tasks need to work on constants, not variables.
@@ -356,74 +332,41 @@ public class RxPSocket {
       }
       else {
 
-        // If it's a handshake packet, send the next handshake packet
-        if (connectionManager.updateConnection(receivedRxPPacket)) {
+        // Only add to the list if this is the right packet. ACK any other one.
+        if (expectedSeqNum == receivedRxPPacket.getSeqNum()) {
+          tempRxPPacketList.add(receivedRxPPacket);
+          expectedSeqNum = receivedRxPPacket.getSeqNum() + 1;
+        }
+        else {
+          System.out.println("Packet Out of Order");
+        }
 
-          Connection connection = connectionManager.getConnection(receivedRxPPacket);
-          RxPPacket handshakePacket = connectionManager.getNextHandshakePacket(connection);
+        // Make an ACK
+        RxPPacket ackRxPPacket = new RxPPacket();
+        ackRxPPacket.setACK(true);
+        ackRxPPacket.setACKNum(receivedRxPPacket.getSeqNum());
+        ackRxPPacket.setDestPort((short)dgPacket.getPort());
+        ackRxPPacket.setSrcPort((short)dgSocket.getLocalPort());
+        if (receivedRxPPacket.isPSH()) {
+          ackRxPPacket.setPSH(true);
+          PSH_ACKsent = true;
+        }
+        ackRxPPacket.setChecksum(ackRxPPacket.calculateChecksum());
 
-          // Send handshake packet as datagram
-          DatagramPacket dg = handshakePacket.asDatagramPacket();
-          dg.setAddress(dgPacket.getAddress());
-          dg.setPort(dgPacket.getPort());
-          dgSocket.send(dg);
+        // Send ACK
+        DatagramPacket dg = ackRxPPacket.asDatagramPacket();
+        dg.setAddress(dgPacket.getAddress());
+        dg.setPort(dgPacket.getPort());
+        dgSocket.send(dg);
 
-          connectionManager.updateConnection(handshakePacket);
+        System.out.println("Sending ACK: " + ackRxPPacket.getACKNum());
 
-          System.out.println("Sending Handshake Response: " + connectionManager.getConnection(handshakePacket).connectionStateToString());
-
-        } else { // Otherwise send ACK
-
-          // Only add to the list if this is the right packet. ACK any other one.
-          if (expectedSeqNum == receivedRxPPacket.getSeqNum()) {
-            tempRxPPacketList.add(receivedRxPPacket);
-            expectedSeqNum = receivedRxPPacket.getSeqNum() + 1;
-          }
-          else {
-            System.out.println("Packet Out of Order");
-          }
-
-          // Make an ACK
-          RxPPacket ackRxPPacket = new RxPPacket();
-          ackRxPPacket.setACK(true);
-          ackRxPPacket.setACKNum(receivedRxPPacket.getSeqNum());
-          ackRxPPacket.setDestPort((short)dgPacket.getPort());
-          ackRxPPacket.setSrcPort((short)dgSocket.getLocalPort());
-          if (receivedRxPPacket.isPSH()) {
-            ackRxPPacket.setPSH(true);
-            PSH_ACKsent = true;
-          }
-          ackRxPPacket.setChecksum(ackRxPPacket.calculateChecksum());
-
-          // Send ACK
-          DatagramPacket dg = ackRxPPacket.asDatagramPacket();
-          dg.setAddress(dgPacket.getAddress());
-          dg.setPort(dgPacket.getPort());
-          dgSocket.send(dg);
-
-          System.out.println("Sending ACK: " + ackRxPPacket.getACKNum());
-
-          if (receivedRxPPacket.isACK() && receivedRxPPacket.isPSH()) {
-            // Make sure the last ACK is received
-            break;
-          }
+        if (receivedRxPPacket.isACK() && receivedRxPPacket.isPSH()) {
+          // Make sure the last ACK is received
+          break;
         }
       }
     }
-
-    // // TODO: expectedSeqNum should not reset everytime receive is called.
-    // // What is the expected sequence number of the first packet? 1?
-    // int expectedSeqNum = 1;
-    //
-    // // TODO: Make sure received packets are not corrupt, duplicate, out of order
-    // for (RxPPacket tempPacket : tempRxPPacketList) {
-    //
-    //   // send handles duplicate packets, check if corrupted or out of order
-    //   if (isCorrupt(tempPacket) || isOutOfOrder(tempPacket, expectedSeqNum)) {
-    //     // TODO: Timeout
-    //   }
-    //   expectedSeqNum++;
-    // }
 
     // If tempPackets pass all the tests (not dup, corrupt, out of order)
     // give the application a byte buffer
