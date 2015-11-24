@@ -21,6 +21,8 @@ public class FxAServer {
 
     while (true) {
 
+      socket.listen();
+
       // Receive Buffer
       byte[] inBuffer = socket.receive();
       System.out.println("Application Layer: " + javax.xml.bind.DatatypeConverter.printHexBinary(inBuffer));

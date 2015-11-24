@@ -30,6 +30,24 @@ public class ConnectionManager {
 		return connection;
 	}
 
+	// Return a connection in the connectionList
+	public Connection getConnection(short destination, short source) {
+		// if connection does not exist create a new connection
+
+		// Does this connection already exist?
+		for (Connection c : connectionList) {
+
+			if ((c.getDestination() == destination && c.getSource() == source) || (c.getDestination() == source && c.getSource() == destination)) {
+				return c;
+			}
+		}
+
+		// Create a new connection
+		Connection connection = new Connection(destination, source);
+		connectionList.add(connection);
+		return connection;
+	}
+
 	public boolean updateConnection(RxPPacket packet) {
 
 		Connection c = this.getConnection(packet);
