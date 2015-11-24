@@ -24,7 +24,7 @@ public class RxPSocket {
   private State currentState;
   private Event event;
   private int oldestUnackedPointer; // oldest unACKed pointer
-  private int windowSize = 1; // Stop and Wait length
+  private int windowSize = 5; // Stop and Wait length
 
   // Variables that are set in the LISTEN/ACCEPT phases.
   // private byte[] inBuffer;
@@ -261,7 +261,11 @@ public class RxPSocket {
           if (ackNumber == packetBuffer[oldestUnackedPointer].getSeqNum()) {
             oldestUnackedPointer++;
             boolean success = resendTask.incrementOldestUnackedPointer();
-            //timer.scheduleAtFixedRate(resendTask, 0, timeoutMillis);
+            timer.cancel();
+            timer.purge();
+            timer = new Timer();
+            resendTask = new ResendTimerTask(oldestUnackedPointer, windowSize, packetBuffer);
+            timer.scheduleAtFixedRate(resendTask, 0, timeoutMillis);
           }
 
           if (rxpPacket.isPSH()) {
@@ -290,7 +294,7 @@ public class RxPSocket {
 
   // TODO: receive packet
   // TODO: receive length?
-  private int expectedSeqNum = -1; // Initial Number
+  private int expectedSeqNum = 1; // Initial Number
   public byte[] receive() throws IOException {
 
     boolean PSH_ACKsent = false;
@@ -331,16 +335,15 @@ public class RxPSocket {
       if (currentChecksum != checksum) {
         System.out.println("Packet Corrupted");
       }
-      else if (expectedSeqNum < receivedRxPPacket.getSeqNum() &&
-               expectedSeqNum != -1) {
-        System.out.println("Packet Out of Order");
-      }
       else {
-        tempRxPPacketList.add(receivedRxPPacket);
-        if (expectedSeqNum == -1) {
-          expectedSeqNum = receivedRxPPacket.getSeqNum();
+        // Only add to the list if this is the right packet. ACK any other one.
+        if (expectedSeqNum == receivedRxPPacket.getSeqNum()) {
+          tempRxPPacketList.add(receivedRxPPacket);
+          expectedSeqNum = receivedRxPPacket.getSeqNum() + 1;
         }
-        expectedSeqNum = receivedRxPPacket.getSeqNum() + 1;
+        else {
+          System.out.println("Packet Out of Order");
+        }
 
         // Make an ACK
         RxPPacket ackRxPPacket = new RxPPacket();

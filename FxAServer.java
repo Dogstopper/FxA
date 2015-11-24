@@ -23,7 +23,8 @@ public class FxAServer {
 
       // Receive Buffer
       byte[] inBuffer = socket.receive();
-      System.out.println("Application Layer: " + javax.xml.bind.DatatypeConverter.printHexBinary(inBuffer));
+      //System.out.println("Application Layer: " + javax.xml.bind.DatatypeConverter.printHexBinary(inBuffer));
+      System.out.println(new String(inBuffer));
 
       // TODO: Try to handle this from buffer/socket, should not have to create packet
       // TODO: Print this info from socket, not packet
@@ -36,8 +37,9 @@ public class FxAServer {
 
         // Send response (byte[]) from handledRequest
         byte[] bytesToSend = coder.toWire(msg);
-        System.out.println("Sending response (" + bytesToSend.length + " bytes):");
-        System.out.println(msg.getFilename());
+
+        //System.out.println("Sending response (" + bytesToSend.length + " bytes):");
+        //System.out.println(msg.getFilename());
         //socket.send(bytesToSend);
       } catch (IOException ioe) {
         System.err.println("Parse error in message: " + ioe.getMessage());
