@@ -62,78 +62,78 @@ public class RxPSocket {
 
     Connection connection = connectionManager.getConnection(dest, src);
 
-    while (!connection.isAllowedToSendData()) {
+    // Handshake Packet
+    RxPPacket handshakePacket = connectionManager.getNextHandshakePacket(connection);
+    
+    try {
+      DatagramPacket dg = handshakePacket.asDatagramPacket();
 
-        // Handshake Packet
-        RxPPacket handshakePacket = connectionManager.getNextHandshakePacket(connection);
-        
-        try {
-          DatagramPacket dg = handshakePacket.asDatagramPacket();
-    
-          // Send Handshake Packet
-          dgSocket.send(dg);
-          connectionManager.updateConnection(handshakePacket);
-    
-        } catch (IOException e) {
-          System.out.println("Handshake Packet did not send");
-        }
-    
-        // Listen for next handshake packet
-        try {
-          this.receive();
-        } catch (IOException e) {
-          System.out.println("Could not receive handshake packet");
-        }
-        
-      }
+      // Send Handshake Packet
+      dgSocket.send(dg);
+      connectionManager.updateConnection(handshakePacket);
+
+    } catch (IOException e) {
+      System.out.println("Handshake Packet did not send");
+    }
+
+    // Listen for next handshake packet
+    try {
+      this.handshake();
+    } catch (IOException e) {
+      System.out.println("Could not receive handshake packet");
+    }
   }
 
   public void listen() {
 
     DatagramPacket dgPacket = new DatagramPacket(new byte[MAX_PACKET_SIZE], MAX_PACKET_SIZE);
-    
+
+    try 
+    {
+      this.handshake();
+    } catch (IOException ioe) {
+      System.out.println("Handshake Packet IOException");
+    }
+  }
+
+  public void handshake() throws IOException {
+
+    DatagramPacket dgPacket = new DatagramPacket(new byte[MAX_PACKET_SIZE], MAX_PACKET_SIZE);
+
     boolean allowedToSendData = false;
     while (!allowedToSendData) {
+      dgSocket.receive(dgPacket);
 
-      try 
-      {
-        dgSocket.receive(dgPacket);
-      
-        // Create RxPPacket from received Datagram Buffer
-        RxPPacket receivedRxPPacket = new RxPPacket(dgPacket.getData());
-  
-        // Check the checksum to make sure no corruption occurred
-        long checksum = receivedRxPPacket.getChecksum();
-        long currentChecksum = receivedRxPPacket.calculateChecksum();
-        
-        if (true) { // (currentChecksum == checksum) {
-  
-          // If it's a handshake packet, send the next handshake packet
-          if (connectionManager.updateConnection(receivedRxPPacket)) {
-  
-            System.out.println("Received Handshake Request: " + connectionManager.getConnection(receivedRxPPacket).connectionStateToString());
-  
-            Connection connection = connectionManager.getConnection(receivedRxPPacket);
-            RxPPacket handshakePacket = connectionManager.getNextHandshakePacket(connection);
-  
-            // Send handshake packet as datagram
-            DatagramPacket dg = handshakePacket.asDatagramPacket();
-            dg.setAddress(dgPacket.getAddress());
-            dg.setPort(dgPacket.getPort());
-            dgSocket.send(dg);
-  
-            connectionManager.updateConnection(handshakePacket);
-  
-            System.out.println("Sending Handshake Response: " + connectionManager.getConnection(handshakePacket).connectionStateToString());
-            
-            // Update while loop condition
-            allowedToSendData = connection.isAllowedToSendData();
-          }
-        } else {
-          System.out.println("Handshake Packet Corrupted");
+      RxPPacket receivedRxPPacket = new RxPPacket(dgPacket.getData());
+
+      // Check the checksum to make sure no corruption occurred
+      long checksum = receivedRxPPacket.getChecksum();
+      long currentChecksum = receivedRxPPacket.calculateChecksum();
+      if (currentChecksum == checksum) {
+
+        // If it's a handshake packet, send the next handshake packet
+        if (connectionManager.updateConnection(receivedRxPPacket)) {
+
+          System.out.println("Received Handshake Request: " + connectionManager.getConnection(receivedRxPPacket).connectionStateToString());
+
+          Connection connection = connectionManager.getConnection(receivedRxPPacket);
+          RxPPacket handshakePacket = connectionManager.getNextHandshakePacket(connection);
+
+          // Send handshake packet as datagram
+          DatagramPacket dg = handshakePacket.asDatagramPacket();
+          dg.setAddress(dgPacket.getAddress());
+          dg.setPort(dgPacket.getPort());
+          dgSocket.send(dg);
+
+          connectionManager.updateConnection(handshakePacket);
+
+          System.out.println("Sending Handshake Response: " + connectionManager.getConnection(handshakePacket).connectionStateToString());
+          
+          // Update while loop condition
+          allowedToSendData = connection.isAllowedToSendData();
         }
-      } catch (IOException ioe) {
-        System.out.println("Handshake Packet IOException");
+      } else {
+        System.out.println("Handshake Packet Corrupted");
       }
     }
   }
@@ -246,23 +246,7 @@ public class RxPSocket {
         dgSocket.receive(dgPacket);
         RxPPacket rxpPacket = new RxPPacket(dgPacket);
 
-        // Check if rxpPacket is related to handshake
-        if (connectionManager.updateConnection(rxpPacket)) {
-
-          Connection connection = connectionManager.getConnection(rxpPacket);
-          RxPPacket handshakePacket = connectionManager.getNextHandshakePacket(connection);
-
-          // Send handshake packet as datagram
-          DatagramPacket dg = handshakePacket.asDatagramPacket();
-          dg.setAddress(dgPacket.getAddress());
-          dg.setPort(dgPacket.getPort());
-          dgSocket.send(dg);
-
-          connectionManager.updateConnection(handshakePacket);
-
-          System.out.println("Handshake ACK Received: " + connectionManager.getConnection(handshakePacket).connectionStateToString());
-
-        } else if (!rxpPacket.isSYN() && rxpPacket.isACK()) {
+        if (!rxpPacket.isSYN() && rxpPacket.isACK()) {
 
           int ackNumber = rxpPacket.getACKNum();
           System.out.println("ACK Received: " + ackNumber);
