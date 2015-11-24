@@ -103,6 +103,7 @@ public class ConnectionManager {
 				psh = false, 
 				fin = false;
 
+		// If the initiater of the handshake receives a connection established flag, DO NOT send anymore handshake packets
 		if (c.sourceInitiatedConnection() && (c.isTryingToEstablish() && c.isAboutToEstablish() && c.isEstablished())) {
 			return null;
 		}

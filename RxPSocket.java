@@ -62,13 +62,13 @@ public class RxPSocket {
 
     Connection connection = connectionManager.getConnection(dest, src);
 
-    // Handshake Packet
+    // Initial Handshake Packet
     RxPPacket handshakePacket = connectionManager.getNextHandshakePacket(connection);
     
     try {
       DatagramPacket dg = handshakePacket.asDatagramPacket();
 
-      // Send Handshake Packet
+      // Send Initial Handshake Packet
       dgSocket.send(dg);
       connectionManager.updateConnection(handshakePacket);
 
@@ -119,17 +119,15 @@ public class RxPSocket {
           Connection connection = connectionManager.getConnection(receivedRxPPacket);
           RxPPacket handshakePacket = connectionManager.getNextHandshakePacket(connection);
 
+          // Handshake Packet is null if it's not necessary to send anymore handshake packets
           if (handshakePacket != null) { 
             
             connectionManager.updateConnection(handshakePacket);
   
-            // Send handshake packet as datagram
-            // if (!connectionManager.getConnection(receivedRxPPacket).isAllowedToSendData()) {
-              DatagramPacket dg = handshakePacket.asDatagramPacket();
-              dg.setAddress(dgPacket.getAddress());
-              dg.setPort(dgPacket.getPort());
-              dgSocket.send(dg);
-            // }
+            DatagramPacket dg = handshakePacket.asDatagramPacket();
+            dg.setAddress(dgPacket.getAddress());
+            dg.setPort(dgPacket.getPort());
+            dgSocket.send(dg);
             
             System.out.println("Sending Handshake Response: " + connectionManager.getConnection(handshakePacket).connectionStateToString());
           }
