@@ -134,7 +134,7 @@ class ServerLoop
 
     try {
       byte[] inBuffer = null;
-      while ((inBuffer = server.receive()) == null);
+      while ((inBuffer = server.receive()).length == 0);
 
       FileMsg msg = coder.fromWire(inBuffer);
       msg = service.handleRequest(msg);

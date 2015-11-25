@@ -130,13 +130,12 @@ public class FxAClient {
     System.out.println("File Encoded. "+new String(encodeMsg));
     socket.send(encodeMsg);
 
-    socket.listen();
     System.out.println("\n\nWaiting for response.");
     // Wait for the response
     byte[] fileBytes = socket.receive();
     FileMsg response = coder.fromWire(fileBytes);
 
-    if (new String(response.getFile()).equals(new String(file))) {
+    if (new String(response.getFile()).trim().equals(new String(file).trim())) {
       System.out.println("File Upload success");
     }
     else {

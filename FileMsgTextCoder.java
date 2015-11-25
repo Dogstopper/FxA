@@ -8,7 +8,6 @@ public class FileMsgTextCoder implements MsgCoder {
 	 * Wire Format "FileMsg" <"g" | "p"> <FILENAME>
 	 * Charset is fixed by the wire format.
 	 */
-	public static final String CHARSETNAME = "US-ASCII";
   	public static final String DELIMSTR = " ";
   	public static final int MAX_WIRE_LENGTH = 2000;
 
@@ -21,14 +20,14 @@ public class FileMsgTextCoder implements MsgCoder {
 			+ (msg.isGet()? GET : POST) + DELIMSTR
 			+ msg.getFilename() + (!msg.isGet()? (DELIMSTR + new String(msg.getFile())) : "");
 
-		byte data[] = msgString.getBytes(CHARSETNAME);
+		byte data[] = msgString.getBytes();
 		return data;
 	}
 
 	public FileMsg fromWire(byte[] message) throws IOException {
-    
+
 		ByteArrayInputStream msgStream = new ByteArrayInputStream(message);
-		Scanner s = new Scanner(new InputStreamReader(msgStream, CHARSETNAME));
+		Scanner s = new Scanner(new InputStreamReader(msgStream));
 
 		boolean isGet;
 		String filename;
@@ -65,7 +64,7 @@ public class FileMsgTextCoder implements MsgCoder {
           token = s.nextLine();
     			buffer.append(token + "\n");
         }
-        file = buffer.toString().getBytes(CHARSETNAME);
+        file = buffer.toString().getBytes();
       }
 
 		} catch (IOException ioe) {
