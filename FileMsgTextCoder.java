@@ -19,28 +19,32 @@ public class FileMsgTextCoder implements MsgCoder {
 	public byte[] toWire(FileMsg msg) throws IOException {
 		String msgString = PROTOCOL + DELIMSTR
 			+ (msg.isGet()? GET : POST) + DELIMSTR
-			+ msg.getFilename();
+			+ msg.getFilename() + (!msg.isGet()? (DELIMSTR + new String(msg.getFile())) : "");
 
-      System.out.println(msgString);
 		byte data[] = msgString.getBytes(CHARSETNAME);
 		return data;
 	}
 
 	public FileMsg fromWire(byte[] message) throws IOException {
+    
 		ByteArrayInputStream msgStream = new ByteArrayInputStream(message);
 		Scanner s = new Scanner(new InputStreamReader(msgStream, CHARSETNAME));
 
 		boolean isGet;
 		String filename;
+    byte[] file = null;
 
 		String token;
 
-		try {
-			token = s.next();
 
+		try {
+      // Determine that our protocol is being used
+			token = s.next();
 			if (!token.equals(PROTOCOL)) {
 				throw new IOException("Bad protocol string: " + token);
 			}
+
+      // Decide whether GET or POST
 			token = s.next();
 			if (token.equals(GET)) {
 				isGet = true;
@@ -50,16 +54,23 @@ public class FileMsgTextCoder implements MsgCoder {
 				throw new IOException("Bad GET/POST indicator: " + token);
 			}
 
-      StringBuffer buffer = new StringBuffer();
-      while(s.hasNextLine()) {
-        token = s.nextLine();
-  			buffer.append(token + "\n");
+      // Get the filename
+      token = s.next();
+      filename = token;
+
+      // If the request is not a GET request, then add the file.
+      if (!isGet) {
+        StringBuffer buffer = new StringBuffer();
+        while(s.hasNextLine()) {
+          token = s.nextLine();
+    			buffer.append(token + "\n");
+        }
+        file = buffer.toString().getBytes(CHARSETNAME);
       }
-      filename = buffer.toString();
 
 		} catch (IOException ioe) {
 			throw new IOException("Parse error...");
 		}
-		return new FileMsg(isGet, filename);
+		return new FileMsg(isGet, filename, file);
 	}
 }

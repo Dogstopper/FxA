@@ -17,7 +17,7 @@ public class RxPPacket {
   public RxPPacket(byte[] buf) {
     //System.out.println("Received Buffer: " + javax.xml.bind.DatatypeConverter.printHexBinary(buf));
     byte[] dataBytes = Arrays.copyOfRange(buf, 0, DEFAULT_PACKET_SIZE+28);
-    System.out.println("Received Data: " + javax.xml.bind.DatatypeConverter.printHexBinary(dataBytes));
+    //System.out.println("Received Data: " + javax.xml.bind.DatatypeConverter.printHexBinary(dataBytes));
 
     this.data = ByteBuffer.wrap(dataBytes);
   }
@@ -108,7 +108,7 @@ public class RxPPacket {
   }
 
   public boolean isPSH() {
-    System.out.println("FLAGS: " + this.data.get(FLAGS_BYTE_OFFSET));
+    //System.out.println("FLAGS: " + this.data.get(FLAGS_BYTE_OFFSET));
     byte result = (byte) ( this.data.get(FLAGS_BYTE_OFFSET) & PSH_MASK);
     return result == PSH_MASK;
   }

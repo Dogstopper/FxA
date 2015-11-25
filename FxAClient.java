@@ -2,56 +2,190 @@
 import java.io.*;
 import java.net.InetAddress;
 import java.util.Arrays;
+import java.util.Scanner;
 
 public class FxAClient {
 
-	public static void main(String args[]) throws IOException {
+  // Connection data
+  private int port;
+  private int netEmuPort;
+  private InetAddress netEmuInetAddress;
+  private RxPSocket socket;
+  private MsgCoder coder;
 
-		int port, netEmuPort;
+  public FxAClient(int port, int netEmuPort, InetAddress netEmuInetAddress) throws IOException {
+    this.port = port;
+    this.netEmuPort = netEmuPort;
+    this.netEmuInetAddress = netEmuInetAddress;
+    this.coder = new FileMsgTextCoder();
 
-		String netEmuIPString;
+    // Creates Client's RxPSocket bound to Client's localhost and even port
+    InetAddress localhost = InetAddress.getByName("127.0.0.1");
+    socket = new RxPSocket(port, localhost);
+  }
 
-		InetAddress localhost = InetAddress.getByName("127.0.0.1"),
-					netEmuInetAddress;
+  private void mainLoop() throws IOException {
+    Scanner scanner = new Scanner(System.in);
+    while(true) {
+      System.out.print("> ");
+      if (scanner.hasNextLine()) {
+        String command = scanner.next();
+        if (command.equals("connect")) {
+          connect();
+        }
+        else if (command.equals("get")) {
+          String filename = scanner.next();
+          scanner.nextLine();
+          getFile(filename);
+        }
+        else if (command.equals("post")) {
+          String filename = scanner.next();
+          scanner.nextLine();
+          postFile(filename);
+        }
+        else if (command.equals("window")) {
+          int windowSize = scanner.nextInt();
+          scanner.nextLine();
+          setWindowSize(windowSize);
+        }
+        else if (command.equals("disconnect")) {
+          disconnect();
+        }
+        else {
+          System.out.println("Not a valid command.");
+        }
+      }
+    }
+  }
+
+  private void connect() {
+	  socket.connect(netEmuInetAddress, netEmuPort);
+  }
+
+  private void listen() {
+    socket.listen();
+  }
+
+  private void disconnect() {
+    // TODO: Implement
+  }
+
+  private void setWindowSize(int windowSize) {
+    socket.setWindowSize(windowSize);
+  }
+
+  private void getFile(String filename) throws IOException {
+    // Send the request to the server
+    FileMsg request = new FileMsg(true, filename, null);
+    byte[] encodedMsg = coder.toWire(request);
+    while (!socket.send(encodedMsg)) {
+      System.err.println("Attempting to connect again.");
+      connect();
+    }
+
+    // Wait for the server to respond to the request with a byte[]
+    byte[] fileBytes = null;
+    while ((fileBytes = socket.receive()) == null) {
+      System.err.println("Attempting to connect again.");
+      connect();
+    }
+    FileMsg response = coder.fromWire(fileBytes);
+
+    if (response.isGet()) {
+      System.err.println("The filename was wrong.");
+      return;
+    }
+
+    try {
+      File newFile = new File(response.getFilename());
+      FileOutputStream fs = new FileOutputStream(newFile);
+      fs.write(response.getFile());
+    } catch(Exception e) {
+      System.err.println("The file could not be saved.");
+      System.err.println(e.getMessage());
+    }
+    System.out.println("File was downloaded successfully.\nSaved as: " + filename);
+  }
+
+  private void postFile(String filename) throws IOException {
+    FileInputStream newFile = null;
+    try {
+      newFile = new FileInputStream(filename);
+    } catch(FileNotFoundException fnfe) {
+      System.err.println("The file to upload could not be found.");
+      System.err.println(fnfe.getMessage());
+      return;
+    }
+
+    // Read in the file
+    byte[] file = new byte[newFile.available()];
+    newFile.read(file);
+
+    System.out.println("File Read. Num Bytes="+file.length);
+
+    // Send it.
+    FileMsg request = new FileMsg(false, filename, file);
+    byte[] encodeMsg = coder.toWire(request);
+    System.out.println("File Encoded. Num Bytes="+encodeMsg.length);
+    System.out.println("File Encoded. "+new String(encodeMsg));
+    socket.send(encodeMsg);
+
+    socket.listen();
+    System.out.println("\n\nWaiting for response.");
+    // Wait for the response
+    byte[] fileBytes = socket.receive();
+    FileMsg response = coder.fromWire(fileBytes);
+
+    if (new String(response.getFile()).equals(new String(file))) {
+      System.out.println("File Upload success");
+    }
+    else {
+      System.out.println("File upload failed");
+    }
+  }
+
+	public static void main(String args[]) throws Exception {
+    int inPort;
+    int inNetEmuPort;
+		String inNetEmuIPString;
 
 		// Test for correct # of args
-	    if (args.length != 3) {
-	      throw new IllegalArgumentException("Parameter(s): <port-evenNum>" + " <NetEmu-IP> <NetEmu-Port#>");
-	    }
+    if (args.length != 3) {
+      throw new IllegalArgumentException("Parameter(s): <port-evenNum>  <NetEmu-IP> <NetEmu-Port#>");
+    }
 
-	    // Initialize Port and NetEmu Address/Port with command line arguments
-	    port = Integer.parseInt(args[0]);
-	    netEmuIPString = args[1];
-	    netEmuPort = Integer.parseInt(args[2]);
+    // Initialize Port and NetEmu Address/Port with command line arguments
+    inPort = Integer.parseInt(args[0]);
+    if (inPort % 2 != 0) {
+      throw new IllegalArgumentException("Port number of localhost must be even");
+    }
+    inNetEmuIPString = args[1];
+    inNetEmuPort = Integer.parseInt(args[2]);
 
-	    // Create NetEmu InetAddress Obj
-	    netEmuInetAddress = InetAddress.getByName(netEmuIPString);
+    // Create NetEmu InetAddress Obj
+    InetAddress inNetEmuInetAddress = InetAddress.getByName(inNetEmuIPString);
 
-	    // Creates Client's RxPSocket bound to Client's localhost and even port
-	    RxPSocket socket = new RxPSocket(port, localhost);
-
-		// connect - The FxA-client connects to the NetEmu which then connects to the FxA-server (running at the same IP host).
-	    socket.connect(netEmuInetAddress, netEmuPort);
-
-		/*
-		 * get F
-		 * The FxA-client downloads file F from the server (if F exists in the same directory with the FxA-server program).
-	     */
-
-	    boolean isGet = true;
-	    //String filename = "helloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txt";
-		    FileMsg fileMsg = new FileMsg(true, bookText);
-
-		// Change Text to Bin
-    	MsgCoder coder = new FileMsgTextCoder();
-    	byte[] encodedMsg = coder.toWire(fileMsg);
-    	System.out.println("Sending Text-Encoded Request (" + encodedMsg.length + " bytes): ");
-        System.out.println("Encoded Payload: " + javax.xml.bind.DatatypeConverter.printHexBinary(encodedMsg));
-
-        // Send bytes to RxPSocket
-        socket.send(encodedMsg);
-
-        System.out.println("CLIENT SENT ALL DATA\n\n\n");
+    (new FxAClient(inPort, inNetEmuPort, inNetEmuInetAddress)).mainLoop();
+  }
+		// /*
+		//  * get F
+		//  * The FxA-client downloads file F from the server (if F exists in the same directory with the FxA-server program).
+	  //    */
+    //
+	  //   boolean isGet = true;
+	  //   //String filename = "helloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txthelloworld.txt";
+		//     FileMsg fileMsg = new FileMsg(true, bookText);
+    //
+		// // Change Text to Bin
+    // 	MsgCoder coder = new FileMsgTextCoder();
+    // 	byte[] encodedMsg = coder.toWire(fileMsg);
+    // 	System.out.println("Sending Text-Encoded Request (" + encodedMsg.length + " bytes): ");
+    //     System.out.println("Encoded Payload: " + javax.xml.bind.DatatypeConverter.printHexBinary(encodedMsg));
+    //
+    //     // Send bytes to RxPSocket
+    //     socket.send(encodedMsg);
+    //
+    //     System.out.println("CLIENT SENT ALL DATA\n\n\n");
         // Receive Response
       //   byte[] inBuffer = socket.receive();
       //
@@ -71,7 +205,7 @@ public class FxAClient {
 		// window W (only for projects that support configurable flow window) W: the maximum receiver’s window-size at the FxA-Client (in segments).
 
 		// disconnect - The FxA-client terminates gracefully from the FxA-server.
-	}
+	// }
 
   static String bookText = "GREAT EXPECTATIONS\n" +
 " \n" +
