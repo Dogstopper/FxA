@@ -537,6 +537,14 @@ public class RxPSocket {
           dgSocket.send(dg);
 
           System.out.println("Sending ACK: " + ackRxPPacket.getACKNum());
+
+          connectionManager.updateConnection(ackRxPPacket);
+
+          // When Client sends ack or server sends FIN remove connection or you could timeout
+          if (connectionManager.getConnection(ackRxPPacket).isClientSentACK()) {
+            // connectionManager.removeConnection(ackRxPPacket.getSrcPort(), ackRxPPacket.getDestPort());
+            return null;
+          }
         }        
       }
     }
