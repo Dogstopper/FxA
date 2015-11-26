@@ -28,6 +28,11 @@ public class Connection {
 		this.isEstablished = false;
 		this.isAllowedToSendData = false;
 		this.isSendingData = false;
+
+		this.isClientSentFIN = false;
+		this.isServerSentACK = false;
+		this.isServerSentFIN = false;
+		this.isClientSentACK = false;
 	}
 
 	public String connectionStateToString() {

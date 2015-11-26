@@ -49,7 +49,8 @@ public class ConnectionManager {
 	}
 
 	public boolean updateConnection(RxPPacket packet) {
-		
+		System.out.println(this.getConnectionPacketStatus(packet));
+
 		boolean connectionUpdated = false; // return this
 
 		Connection c = this.getConnection(packet);
@@ -63,6 +64,7 @@ public class ConnectionManager {
 				
 				c.setTryingToEstablish(true); 
 				connectionUpdated = true;
+				System.out.println("updated: setTryingToEstablish");
 			}
 		}
 
@@ -74,6 +76,7 @@ public class ConnectionManager {
 				
 				c.setAboutToEstablish(true); 
 				connectionUpdated = true;
+				System.out.println("updated: setAboutToEstablish");
 			}
 		}
 
@@ -85,6 +88,7 @@ public class ConnectionManager {
 				
 				c.setEstablished(true); 
 				connectionUpdated = true;
+				System.out.println("updated: setEstablished");
 			}
 		}
 
@@ -96,6 +100,7 @@ public class ConnectionManager {
 				
 				c.setAllowedToSendData(true); 
 				connectionUpdated = true;
+				System.out.println("updated: setAllowedToSendData");
 			}
 		}
 
@@ -107,47 +112,53 @@ public class ConnectionManager {
 				
 				c.setSendingData(true); 
 				connectionUpdated = true;
+				System.out.println("updated: setSendingData");
 			}
 		}
 
 		/* Closing Connection */
 
-		if (c.isSendingData() && !c.isClientSentFIN()) {
+		if (!c.isClientSentFIN()) {
 
 			if (packet.isFIN() && !packet.isACK() && !packet.isSYN()) {
 				
 				c.setClientSentFIN(true);
 				connectionUpdated = true;
+				System.out.println("updated: setClientSentFIN");
 			}
 		}
 
-		if (c.isSendingData() && c.isClientSentFIN() && !c.isServerSentACK()) {
+		if (c.isClientSentFIN() && !c.isServerSentACK()) {
 
 			if (!packet.isFIN() && packet.isACK()) {
 				
 				c.setServerSentACK(true);
 				connectionUpdated = true;
+				System.out.println("updated: setServerSentACK");
 			}
 		}
 
-		if (c.isSendingData() && c.isClientSentFIN() && c.isServerSentACK() && !c.isServerSentFIN()) {
+		if (c.isClientSentFIN() && c.isServerSentACK() && !c.isServerSentFIN()) {
 
 			if (packet.isFIN() && !packet.isACK()) {
 				
 				c.setServerSentFIN(true);
 				connectionUpdated = true;
+				System.out.println("updated: setServerSentFIN");
 			}
 		}
 
-		if (c.isSendingData() && c.isClientSentFIN() && c.isServerSentACK() && c.isServerSentFIN() && !c.isClientSentACK()) {
+		if (c.isClientSentFIN() && c.isServerSentACK() && c.isServerSentFIN() && !c.isClientSentACK()) {
 
 			if (!packet.isFIN() && packet.isACK()) {
 				
 				c.setClientSentACK(true);
 				connectionUpdated = true;
+				System.out.println("updated: setClientSentACK");
 			}
 		}
 		
+		System.out.println("connectionUpdated: " + connectionUpdated);
 		return connectionUpdated;
 	} 
 
@@ -410,5 +421,21 @@ public class ConnectionManager {
 				break;
 			}
 		}
+	}
+
+	private String getConnectionPacketStatus(RxPPacket p) {
+
+		Connection c = this.getConnection(p);
+
+		String str = "isClient: " + c.isClient()
+				   + "\nisClientSentFIN: " + c.isClientSentFIN()
+				   + "\nisServerSentACK: " + c.isServerSentACK()
+				   + "\nisServerSentFIN: " + c.isServerSentFIN() 
+				   + "\nisClientSentACK: " + c.isClientSentACK()
+				   + "\nisFIN: " + p.isFIN() 
+				   + "\nisACK: " + p.isACK()
+				   + "\nisSYN: " + p.isSYN();
+
+		return str;
 	}
 }
