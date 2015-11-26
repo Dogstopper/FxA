@@ -198,18 +198,33 @@ public class RxPSocket {
   // Socket API Method
   public void close() {
     this.closeClientConnection(this.srcPort, this.destPort);
+    connectionManager.removeConnection(this.srcPort, this.destPort);
   }
 
   private void closeClientConnection(short src, short dest) {
 
     Connection connection = connectionManager.getConnection(src, dest);
 
-    // Initial FIN Packet
-    RxPPacket rxpPacketFIN = connectionManager.getNextClosePacket(connection);
-    connectionManager.updateConnection(rxpPacketFIN);
+    while (!connectionManager.getConnection(src, dest).isClientSentACK()) {
 
-    // Send FIN Packet, will be ACK'd within send
-    this.sendRxPPackets(new RxPPacket[] { rxpPacketFIN });
+      // Initial FIN Packet
+      RxPPacket rxpPacketFIN = connectionManager.getNextClosePacket(connection);
+      connectionManager.updateConnection(rxpPacketFIN);
+  
+      // Send FIN Packet, will be ACK'd within send
+      this.sendRxPPackets(new RxPPacket[] { rxpPacketFIN });
+
+      // Receive FIN, send ACK
+      try {
+        this.receive();
+      } catch (IOException ioe) {
+      }
+
+      if (connectionManager.getConnection(src, dest).isClientSentACK()) {
+        this.dgSocket.close();
+        System.out.println("Closed Socket");
+      }
+    }
   }
 
   private class ResendTimerTask extends TimerTask {
@@ -432,7 +447,7 @@ public class RxPSocket {
         System.out.println("Packet Corrupted");
         continue;
       }
-      else if (updateConnection) {
+      else if (!connectionManager.getConnection(receivedRxPPacket).isAllowedToSendData() && updateConnection) {
         System.out.println("Update Connection: " + true);
         // If the client is still waiting for the fifth handshake, process that instead.
         Connection connection = connectionManager.getConnection(receivedRxPPacket);
@@ -467,6 +482,39 @@ public class RxPSocket {
           
           System.out.println("Received FIN: Close Connection");
           ackRxPPacket = connectionManager.getNextClosePacket(connectionManager.getConnection(receivedRxPPacket));
+          
+          // Send ACK
+          DatagramPacket dg = ackRxPPacket.asDatagramPacket();
+          dg.setAddress(dgPacket.getAddress());
+          dg.setPort(dgPacket.getPort());
+          dgSocket.send(dg);
+
+          System.out.println("Sending ACK in Response to FIN: " + ackRxPPacket.getACKNum());
+
+          connectionManager.updateConnection(ackRxPPacket);
+
+          // Send a FIN (if server, otherwise close)
+          if (!connectionManager.getConnection(ackRxPPacket).isClient()) {
+
+            // Server send FIN (Received FIN from Client and ACKd that FIN)
+            RxPPacket finRxPPacket = connectionManager.getNextClosePacket(connectionManager.getConnection(receivedRxPPacket));
+
+            // send FIN
+            dg = finRxPPacket.asDatagramPacket();
+            dg.setAddress(dgPacket.getAddress());
+            dg.setPort(dgPacket.getPort());
+            dgSocket.send(dg);
+
+            System.out.println("Sending FIN to Client");
+
+            connectionManager.updateConnection(finRxPPacket);
+
+          } else {
+
+            // Client close (received FIN from Server)
+            this.dgSocket.close();
+            return null;
+          }
         } else {
         
           // Make an ACK
@@ -481,15 +529,15 @@ public class RxPSocket {
             System.out.println("Sending PSH+ACK");
           }
           ackRxPPacket.setChecksum(ackRxPPacket.calculateChecksum());
-        }
 
-        // Send ACK
-        DatagramPacket dg = ackRxPPacket.asDatagramPacket();
-        dg.setAddress(dgPacket.getAddress());
-        dg.setPort(dgPacket.getPort());
-        dgSocket.send(dg);
+          // Send ACK
+          DatagramPacket dg = ackRxPPacket.asDatagramPacket();
+          dg.setAddress(dgPacket.getAddress());
+          dg.setPort(dgPacket.getPort());
+          dgSocket.send(dg);
 
-        System.out.println("Sending ACK: " + ackRxPPacket.getACKNum());
+          System.out.println("Sending ACK: " + ackRxPPacket.getACKNum());
+        }        
       }
     }
 

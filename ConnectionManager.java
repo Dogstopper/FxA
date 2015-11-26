@@ -376,21 +376,19 @@ public class ConnectionManager {
 			System.out.println("ServerSendingACK");
 		}
 
-		// Connection could be entering "Establish" state
-		if (c.isClient() && (c.isClientSentFIN() && c.isServerSentACK() && !c.isServerSentFIN())) {
+		if (!c.isClient() && (c.isClientSentFIN() && c.isServerSentACK() && !c.isServerSentFIN())) {
 
-			seqNum = 2; 
+			seqNum = 1; 
 
 			fin = true;
 
 			System.out.println("ServerSendingFin");
 		}
 
-		// Connection could be entering "Allowed To Send Data" state
 		if (c.isClient() && (c.isClientSentFIN() && c.isServerSentACK() && c.isServerSentFIN() && !c.isClientSentACK())) {
 
 			// seqNum = 4;
-			ackNum = 2;
+			ackNum = 1;
 
 			ack = true;
 

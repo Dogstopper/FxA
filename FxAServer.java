@@ -223,6 +223,8 @@ class ServerLoop implements Callable<Object> {
 
     MsgCoder coder = new FileMsgTextCoder();
     FileService service = new FileService();
+
+    
     while (true) {
       try {
         byte[] inBuffer = null;
