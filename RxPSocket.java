@@ -54,11 +54,12 @@ public class RxPSocket {
     RxPPacket handshakePacket = connectionManager.getNextHandshakePacket(connection);
 
     try {
+
       DatagramPacket dg = handshakePacket.asDatagramPacket();
+      connectionManager.updateConnection(handshakePacket);
 
       // Send Initial Handshake Packet
       dgSocket.send(dg);
-      connectionManager.updateConnection(handshakePacket);
 
     } catch (IOException e) {
       System.out.println("Handshake Packet did not send");
@@ -83,7 +84,7 @@ public class RxPSocket {
     }
   }
 
-  public void handshake(String hostType, short dest, short src) throws IOException {
+  public void handshake(String hostType, short dest, short source) throws IOException {
 
     DatagramPacket dgPacket = new DatagramPacket(new byte[MAX_PACKET_SIZE], MAX_PACKET_SIZE);
 
@@ -92,8 +93,12 @@ public class RxPSocket {
     boolean sendingData = false;
 
     // Used to resend lost handshake packets
-    Timer timer = new Timer();
     int timeoutMillis = 300;
+    try {
+      dgSocket.setSoTimeout(timeoutMillis);
+    } catch(SocketException se) {
+      // TODO: Add error handling
+    }
 
     while (!sendingData) {
 
@@ -115,55 +120,85 @@ public class RxPSocket {
       //     timer.scheduleAtFixedRate(resendTask, 0, timeoutMillis);
       //   }
       // }
-
-      dgSocket.receive(dgPacket);
+      try {
+        dgSocket.receive(dgPacket);
+      }
+      catch(SocketTimeoutException ste) {
+        if (connectionManager.getConnection(dest, source).isAllowedToSendData()) {
+          // If the client has moved into the sending data state, so let's give one
+          // last shot.
+          connectionManager.getConnection(dest, source).setSendingData(true);
+          break;
+        }
+        else if (serverConnection != null ||  hostType.equals("Client")) { // successfully connected
+          sendHandshakePacket(dest, source, dgPacket, false);
+          System.out.println("Timeout");
+        }
+        continue;
+      }
 
       RxPPacket receivedRxPPacket = new RxPPacket(dgPacket.getData());
-
-      // Initialize servers connection after first packet is received
-      if (hostType.equals("Server") && serverConnection == null) {
-        serverConnection = connectionManager.getConnection(receivedRxPPacket);
-      }
 
       // Check the checksum to make sure no corruption occurred
       long checksum = receivedRxPPacket.getChecksum();
       long currentChecksum = receivedRxPPacket.calculateChecksum();
       if (currentChecksum == checksum) {
 
+        // Initialize servers connection after first non corrupt packet is received
+        if (hostType.equals("Server") && serverConnection == null) {
+          serverConnection = connectionManager.getConnection(receivedRxPPacket);
+          dest = receivedRxPPacket.getDestPort();
+          source = receivedRxPPacket.getSrcPort();
+        }
+
         // If it's a handshake packet, send the next handshake packet
         if (connectionManager.updateConnection(receivedRxPPacket)) {
 
           System.out.println("Received Handshake Request: " + connectionManager.getConnection(receivedRxPPacket).connectionStateToString());
-
-          Connection connection = connectionManager.getConnection(receivedRxPPacket);
-          RxPPacket handshakePacket = connectionManager.getNextHandshakePacket(connection);
-
-          // Handshake Packet is null if it's not necessary to send anymore handshake packets
-          if (handshakePacket != null) {
-
-            connectionManager.updateConnection(handshakePacket);
-
-            DatagramPacket dg = handshakePacket.asDatagramPacket();
-            dg.setAddress(dgPacket.getAddress());
-            dg.setPort(dgPacket.getPort());
-            dgSocket.send(dg);
-
-            System.out.println("Sending Handshake Response: " + connectionManager.getConnection(handshakePacket).connectionStateToString());
-          }
+          sendHandshakePacket(dest, source, dgPacket, true);
 
           // Update while loop condition
+          Connection connection = connectionManager.getConnection(dest, source);
           allowedToSendData = connection.isAllowedToSendData();
           sendingData = connection.isSendingData();
         }
       } else {
         System.out.println("Handshake Packet Corrupted");
+        sendHandshakePacket(dest, source, dgPacket, false);
       }
-
-
     }
     // do this on successful receive
-    timer.cancel();
     dgSocket.connect(dgPacket.getAddress(), dgPacket.getPort());
+  }
+
+  private void sendHandshakePacket(short dest, short source, DatagramPacket dgPacket, boolean sendNextPacket)
+                throws IOException {
+    Connection connection = connectionManager.getConnection(dest, source);
+    RxPPacket handshakePacket = sendNextPacket ?
+              connectionManager.getNextHandshakePacket(connection):
+              connectionManager.getLastHandshakePacket(connection);
+
+    // Handshake Packet is null if it's not necessary to send anymore handshake packets
+    if (handshakePacket != null) {
+
+      if (sendNextPacket)
+        connectionManager.updateConnection(handshakePacket);
+
+      if (dgPacket.getAddress() == null || dgPacket.getPort() == 0)
+      {
+        dgPacket.setAddress(dgSocket.getInetAddress());
+        dgPacket.setPort(dgSocket.getPort());
+      }
+
+      DatagramPacket dg = handshakePacket.asDatagramPacket();
+      dg.setAddress(dgPacket.getAddress());
+      dg.setPort(dgPacket.getPort());
+      dgSocket.send(dg);
+
+      System.out.println("Sending Handshake Response: " + connectionManager.getConnection(handshakePacket).connectionStateToString());
+      System.out.println();
+    }
+
   }
 
   private class ResendTimerTask extends TimerTask {
@@ -302,7 +337,7 @@ public class RxPSocket {
             timer.scheduleAtFixedRate(resendTask, timeoutMillis, timeoutMillis);
           }
 
-          if (rxpPacket.isPSH() && rxpPacket.isACK()) {
+          if (rxpPacket.isPSH()) {
             // If the received packet is a PSH+ACK, then send a PSH+ACK and quit.
             RxPPacket ackRxPPacket = new RxPPacket();
             ackRxPPacket.setACK(true);
@@ -320,6 +355,8 @@ public class RxPSocket {
             dgSocket.send(dg);
             System.out.println("Sending PSH+ACK");
             timer.cancel();
+            timer.purge();
+            resendTask.cancel();
             return true;
           }
         }
@@ -327,6 +364,8 @@ public class RxPSocket {
         System.err.println("Received Nothing " + resendTask.getNumTimesNoResponse() + " Times");
         if (resendTask.getNumTimesNoResponse() == 40) {
           timer.cancel();
+          timer.purge();
+          resendTask.cancel();
           return false;
         }
       }
@@ -346,7 +385,6 @@ public class RxPSocket {
       // TODO: Add error handling
     }
 
-    // Add to temp buffer
     List<RxPPacket> tempRxPPacketList = new ArrayList<>();
     DatagramPacket dgPacket = new DatagramPacket(new byte[MAX_PACKET_SIZE], MAX_PACKET_SIZE);
     // Receive until PSH flag is set or timeout occurs
@@ -356,7 +394,7 @@ public class RxPSocket {
         dgSocket.receive(dgPacket);
       } catch (SocketTimeoutException ste) {
         receiveAttempts++;
-        if (PSH_ACKsent || receiveAttempts > 40) {
+        if (receiveAttempts > 20) {
           break;
         }
         else {
@@ -378,7 +416,17 @@ public class RxPSocket {
         System.out.println("Packet Corrupted");
       }
       else if (receivedRxPPacket.isPSH() && receivedRxPPacket.isACK() && PSH_ACKsent) {
+        System.out.println("PSH+ACK Received");
         break;
+      }
+      else if (connectionManager.updateConnection(receivedRxPPacket)) {
+        // If the client is still waiting for the fifth handshake, process that instead.
+        System.out.println("Received Handshake Request: " + connectionManager.getConnection(receivedRxPPacket).connectionStateToString());
+        sendHandshakePacket(receivedRxPPacket.getDestPort(), receivedRxPPacket.getSrcPort(),
+            dgPacket, false);
+      }
+      else if (expectedSeqNum < receivedRxPPacket.getSeqNum()) {
+        System.out.println("Packet Out of Order");
       }
       else {
 

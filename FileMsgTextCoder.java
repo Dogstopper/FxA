@@ -61,7 +61,7 @@ public class FileMsgTextCoder implements MsgCoder {
       if (!isGet) {
         StringBuffer buffer = new StringBuffer();
         while(s.hasNextLine()) {
-          token = s.nextLine();
+          token = s.nextLine().trim();
     			buffer.append(token + "\n");
         }
         file = buffer.toString().getBytes();

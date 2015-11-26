@@ -4,6 +4,7 @@ import java.net.InetAddress;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Scanner;
+import java.util.concurrent.*;
 
 public class FxAServer {
 
@@ -26,12 +27,12 @@ public class FxAServer {
   }
 
   public void mainLoop() throws InterruptedException {
-    Thread commandLoopThread = new Thread(new CommandLoop(this));
+    //Thread commandLoopThread = new Thread(new CommandLoop(this));
     Thread serverLoop = new Thread(new ServerLoop(this));
-    commandLoopThread.start();
+    //commandLoopThread.start();
     serverLoop.start();
-    while (serverLoop.isAlive() && commandLoopThread.isAlive()) {
-      commandLoopThread.join(1000);
+    while (true) {
+      //commandLoopThread.join(1000);
       serverLoop.join(1000);
     }
   }
@@ -169,7 +170,7 @@ class ServerLoop
           byte[] encodeMsg = coder.toWire(error);
           System.out.println("File Encoded. Num Bytes="+encodeMsg.length);
 
-          server.send(encodeMsg);
+          while(!server.send(encodeMsg));
 
         }
       }
@@ -180,7 +181,8 @@ class ServerLoop
           fs.write(msg.getFile());
 
           byte[] encodedMsg = coder.toWire(msg);
-          System.out.println("Sending response back");
+          System.out.println("\n\nSending response back");
+          System.out.println(new String(encodedMsg));
           server.send(encodedMsg);
         } catch(Exception e) {
           System.err.println("The file could not be saved.");

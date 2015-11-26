@@ -128,11 +128,12 @@ public class FxAClient {
     byte[] encodeMsg = coder.toWire(request);
     System.out.println("File Encoded. Num Bytes="+encodeMsg.length);
     System.out.println("File Encoded. "+new String(encodeMsg));
-    socket.send(encodeMsg);
+    while (!socket.send(encodeMsg));
 
-    System.out.println("\n\nWaiting for response.");
+    System.out.println("\n\nFile Uploaded. Verifying success");
     // Wait for the response
-    byte[] fileBytes = socket.receive();
+    byte[] fileBytes = null;
+    while ((fileBytes = socket.receive()).length == 0); // Loop until data comes back
     FileMsg response = coder.fromWire(fileBytes);
 
     if (new String(response.getFile()).trim().equals(new String(file).trim())) {
@@ -140,6 +141,14 @@ public class FxAClient {
     }
     else {
       System.out.println("File upload failed");
+      try {
+        File errorFile = new File("upload_failure.txt");
+        FileOutputStream fs = new FileOutputStream(errorFile);
+        fs.write(response.getFile());
+      } catch(Exception e) {
+        System.err.println("The file could not be saved.");
+        System.err.println(e.getMessage());
+      }
     }
   }
 
