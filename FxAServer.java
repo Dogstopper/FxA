@@ -1,4 +1,4 @@
-// java FxAServer 8081
+// java FxAServer 8081 localhost 5000
 import java.io.*;
 import java.net.InetAddress;
 import java.io.IOException;
