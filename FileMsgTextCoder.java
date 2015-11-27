@@ -8,8 +8,8 @@ public class FileMsgTextCoder implements MsgCoder {
 	 * Wire Format "FileMsg" <"g" | "p"> <FILENAME>
 	 * Charset is fixed by the wire format.
 	 */
-  	public static final String DELIMSTR = " ";
-  	public static final int MAX_WIRE_LENGTH = 2000;
+	public static final String DELIMSTR = " ";
+	public static final int MAX_WIRE_LENGTH = 2000;
 
 	public static final String PROTOCOL = "FileMsg";
 	public static final String GET = "g";

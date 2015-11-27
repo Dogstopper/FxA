@@ -39,6 +39,10 @@ public class RxPSocket {
     this.windowSize = windowSize;
   }
 
+  // public boolean isConnected() {
+  //   return connectionManager.getConnection(dgSocket.getPort(), dgSocket.getHostPort());
+  // }
+
   /* Connect, Send, and Receive Methods */
   public void connect(InetAddress address, int port) {
     dgSocket.connect(address, port);
@@ -375,7 +379,6 @@ public class RxPSocket {
         dgSocket.receive(dgPacket);
       } catch (SocketTimeoutException ste) {
         receiveAttempts++;
-        System.out.println(receiveAttempts);
         if (receiveAttempts > 20) {
           break;
         }

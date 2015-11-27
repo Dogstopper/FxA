@@ -12,20 +12,10 @@ import java.nio.file.Path;
 
 public class FxAServer {
 
-  private int port;
-  private int netEmuPort;
-  private InetAddress netEmuInetAddress;
-  private RxPSocket socket;
-  private MsgCoder coder;
-
   private ExecutorService service;
+  private RxPSocket socket;
 
   public FxAServer(int port, int netEmuPort, InetAddress netEmuInetAddress) throws IOException {
-    this.port = port;
-    this.netEmuPort = netEmuPort;
-    this.netEmuInetAddress = netEmuInetAddress;
-    this.coder = new FileMsgTextCoder();
-
     // Creates Client's RxPSocket bound to Client's localhost and even port
     InetAddress localhost = InetAddress.getByName("127.0.0.1");
     socket = new RxPSocket(port, localhost);
@@ -38,9 +28,7 @@ public class FxAServer {
     tasks.add(new ServerLoop(socket));
     tasks.add(new CommandLoop(this));
 
-    System.out.println("Starting Server loop");
     service.invokeAll(tasks);
-    System.out.println("Starting Command loop");
 
     service.shutdown();
     service.awaitTermination(1, TimeUnit.DAYS);
@@ -155,7 +143,12 @@ class ServerLoop implements Callable<Object> {
     try {
       File f = new File(filename.trim());
       if (!f.exists()) {
-        throw new FileNotFoundException();
+        System.err.println("File Not Found");
+        // Send an error back
+        FileMsg error = new FileMsg(true, filename, null);
+        byte[] encodeMsg = new String("FileMsg g " + filename).getBytes();
+        System.out.println("File Encoded. Num Bytes="+encodeMsg.length);
+        return;
       }
 
       Path path = Paths.get(f.getAbsolutePath());
