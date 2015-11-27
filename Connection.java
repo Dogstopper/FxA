@@ -3,7 +3,7 @@ public class Connection {
 	private short destination;
 	private short source;
 
-	private boolean sourceInitiatedConnection; // True if Host Initiated Connection
+	private boolean isClient; // True if Host Initiated Connection
 
 	private boolean isTryingToEstablish;
 	private boolean isAboutToEstablish;
@@ -11,18 +11,28 @@ public class Connection {
 	private boolean isAllowedToSendData;
 	private boolean isSendingData;
 
+	private boolean isClientSentFIN;
+	private boolean isServerSentACK;
+	private boolean isServerSentFIN;
+	private boolean isClientSentACK;
+
 	public Connection(short destination, short source) {
 
 		this.destination = destination;
 		this.source = source;
 
-		this.sourceInitiatedConnection = false;
+		this.isClient = false;
 
 		this.isTryingToEstablish = false;
 		this.isAboutToEstablish = false;
 		this.isEstablished = false;
 		this.isAllowedToSendData = false;
 		this.isSendingData = false;
+
+		this.isClientSentFIN = false;
+		this.isServerSentACK = false;
+		this.isServerSentFIN = false;
+		this.isClientSentACK = false;
 	}
 
 	public String connectionStateToString() {
@@ -39,8 +49,8 @@ public class Connection {
 
 	/* Setters and Getters */
 
-	public boolean sourceInitiatedConnection() {
-	    return this.sourceInitiatedConnection;
+	public boolean isClient() {
+	    return this.isClient;
 	}
 
 	public short getDestination() {
@@ -71,8 +81,25 @@ public class Connection {
 	    return this.isSendingData;
 	}
 
-	public void setSourceInitiatedConnection(boolean sourceInitiatedConnection) {
-	    this.sourceInitiatedConnection = sourceInitiatedConnection;
+
+	public boolean isClientSentFIN() {
+	    return this.isClientSentFIN;
+	}
+
+	public boolean isServerSentACK() {
+	    return this.isServerSentACK;
+	}
+
+	public boolean isServerSentFIN() {
+	    return this.isServerSentFIN;
+	}
+
+	public boolean isClientSentACK() {
+	    return this.isClientSentACK;
+	}
+
+	public void setIsClient(boolean isClient) {
+	    this.isClient = isClient;
 	}
 
 	public void setDestination(short destination) {
@@ -101,5 +128,21 @@ public class Connection {
 
 	public void setSendingData(boolean isSendingData) {
 	    this.isSendingData = isSendingData;
+	}
+
+	public void setClientSentFIN(boolean isClientSentFIN) {
+	    this.isClientSentFIN = isClientSentFIN;
+	}
+
+	public void setServerSentACK(boolean isServerSentACK) {
+	    this.isServerSentACK = isServerSentACK;
+	}
+
+	public void setServerSentFIN(boolean isServerSentFIN) {
+	    this.isServerSentFIN = isServerSentFIN;
+	}
+
+	public void setClientSentACK(boolean isClientSentACK) {
+	    this.isClientSentACK = isClientSentACK;
 	}
 }

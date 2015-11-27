@@ -13,7 +13,13 @@ public class RxPSocket {
   // Variables that are set in the LISTEN/ACCEPT phases.
   private InetAddress acceptedAddress;
 
-  private ConnectionManager connectionManager;
+  private static ConnectionManager connectionManager;
+
+  private short srcPort;
+  private short destPort;
+
+  private InetAddress srcAddress;
+  private InetAddress destAddress;
 
   // TODO: Add a timer for timeouts.
 
@@ -23,14 +29,19 @@ public class RxPSocket {
     connectionManager = new ConnectionManager();
   }
 
-  public RxPSocket(int port)
-      throws SocketException {
+  public RxPSocket(int port) throws SocketException {
+
+    this.srcPort = (short) port;
+
     dgSocket = new DatagramSocket(port);
     connectionManager = new ConnectionManager();
 	}
 
-	public RxPSocket(int port, InetAddress address)
-      throws SocketException {
+	public RxPSocket(int port, InetAddress address) throws SocketException {
+
+    this.srcPort = (short) port;
+    this.srcAddress = address;
+
     dgSocket = new DatagramSocket(port, address);
     connectionManager = new ConnectionManager();
 	}
@@ -45,6 +56,9 @@ public class RxPSocket {
 
   /* Connect, Send, and Receive Methods */
   public void connect(InetAddress address, int port) {
+    this.destAddress = address;
+    this.destPort = (short) port;
+
     dgSocket.connect(address, port);
 
     // Initiate handshake
@@ -183,6 +197,38 @@ public class RxPSocket {
       System.out.println();
     }
 
+  }
+
+  // Socket API Method
+  public void close() {
+    this.closeClientConnection(this.srcPort, this.destPort);
+    connectionManager.removeConnection(this.srcPort, this.destPort);
+  }
+
+  private void closeClientConnection(short src, short dest) {
+
+    Connection connection = connectionManager.getConnection(src, dest);
+
+    while (!connectionManager.getConnection(src, dest).isClientSentACK()) {
+
+      // Initial FIN Packet
+      RxPPacket rxpPacketFIN = connectionManager.getNextClosePacket(connection);
+      connectionManager.updateConnection(rxpPacketFIN);
+  
+      // Send FIN Packet, will be ACK'd within send
+      this.sendRxPPackets(new RxPPacket[] { rxpPacketFIN });
+
+      // Receive FIN, send ACK
+      try {
+        this.receive();
+      } catch (IOException ioe) {
+      }
+
+      if (connectionManager.getConnection(src, dest).isClientSentACK()) {
+        this.dgSocket.close();
+        System.out.println("Closed Socket");
+      }
+    }
   }
 
   private class ResendTimerTask extends TimerTask {
@@ -395,13 +441,17 @@ public class RxPSocket {
       long checksum = receivedRxPPacket.getChecksum();
       long currentChecksum = receivedRxPPacket.calculateChecksum();
 
+      boolean updateConnection = connectionManager.updateConnection(receivedRxPPacket);
       System.out.println("Expected: " + expectedSeqNum + "\tReceived: " + receivedRxPPacket.getSeqNum());
+      System.out.println("FIN: " + receivedRxPPacket.isFIN());
+      System.out.println("Update Connection: " + updateConnection);
 
       if (currentChecksum != checksum) {
         System.out.println("Packet Corrupted");
         continue;
       }
-      else if (connectionManager.updateConnection(receivedRxPPacket)) {
+      else if (!connectionManager.getConnection(receivedRxPPacket).isAllowedToSendData() && updateConnection) {
+        System.out.println("Update Connection: " + true);
         // If the client is still waiting for the fifth handshake, process that instead.
         Connection connection = connectionManager.getConnection(receivedRxPPacket);
         System.out.println("Received Handshake Request: " + connection.connectionStateToString());
@@ -430,26 +480,75 @@ public class RxPSocket {
             System.out.println("Packet Out of Order");
         }
 
-        // Make an ACK
-        RxPPacket ackRxPPacket = new RxPPacket();
-        ackRxPPacket.setACK(true);
-        ackRxPPacket.setACKNum(receivedRxPPacket.getSeqNum());
-        ackRxPPacket.setDestPort((short)dgPacket.getPort());
-        ackRxPPacket.setSrcPort((short)dgSocket.getLocalPort());
-        if (receivedRxPPacket.isPSH()) {
-          ackRxPPacket.setPSH(true);
-          PSH_ACKsent = true;
-          System.out.println("Sending PSH+ACK");
-        }
-        ackRxPPacket.setChecksum(ackRxPPacket.calculateChecksum());
+        RxPPacket ackRxPPacket;
+        if (receivedRxPPacket.isFIN() && !receivedRxPPacket.isSYN()) {
+          
+          System.out.println("Received FIN: Close Connection");
+          ackRxPPacket = connectionManager.getNextClosePacket(connectionManager.getConnection(receivedRxPPacket));
+          
+          // Send ACK
+          DatagramPacket dg = ackRxPPacket.asDatagramPacket();
+          dg.setAddress(dgPacket.getAddress());
+          dg.setPort(dgPacket.getPort());
+          dgSocket.send(dg);
 
-        // Send ACK
-        DatagramPacket dg = ackRxPPacket.asDatagramPacket();
-        dg.setAddress(dgPacket.getAddress());
-        dg.setPort(dgPacket.getPort());
-        dgSocket.send(dg);
+          System.out.println("Sending ACK in Response to FIN: " + ackRxPPacket.getACKNum());
 
-        System.out.println("Sending ACK: " + ackRxPPacket.getACKNum());
+          connectionManager.updateConnection(ackRxPPacket);
+
+          // Send a FIN (if server, otherwise close)
+          if (!connectionManager.getConnection(ackRxPPacket).isClient()) {
+
+            // Server send FIN (Received FIN from Client and ACKd that FIN)
+            RxPPacket finRxPPacket = connectionManager.getNextClosePacket(connectionManager.getConnection(receivedRxPPacket));
+
+            // send FIN
+            dg = finRxPPacket.asDatagramPacket();
+            dg.setAddress(dgPacket.getAddress());
+            dg.setPort(dgPacket.getPort());
+            dgSocket.send(dg);
+
+            System.out.println("Sending FIN to Client");
+
+            connectionManager.updateConnection(finRxPPacket);
+
+          } else {
+
+            // Client close (received FIN from Server)
+            this.dgSocket.close();
+            return null;
+          }
+        } else {
+        
+          // Make an ACK
+          ackRxPPacket = new RxPPacket();
+          ackRxPPacket.setACK(true);
+          ackRxPPacket.setACKNum(receivedRxPPacket.getSeqNum());
+          ackRxPPacket.setDestPort((short)dgPacket.getPort());
+          ackRxPPacket.setSrcPort((short)dgSocket.getLocalPort());
+          if (receivedRxPPacket.isPSH()) {
+            ackRxPPacket.setPSH(true);
+            PSH_ACKsent = true;
+            System.out.println("Sending PSH+ACK");
+          }
+          ackRxPPacket.setChecksum(ackRxPPacket.calculateChecksum());
+
+          // Send ACK
+          DatagramPacket dg = ackRxPPacket.asDatagramPacket();
+          dg.setAddress(dgPacket.getAddress());
+          dg.setPort(dgPacket.getPort());
+          dgSocket.send(dg);
+
+          System.out.println("Sending ACK: " + ackRxPPacket.getACKNum());
+
+          connectionManager.updateConnection(ackRxPPacket);
+
+          // When Client sends ack or server sends FIN remove connection or you could timeout
+          if (connectionManager.getConnection(ackRxPPacket).isClientSentACK()) {
+            // connectionManager.removeConnection(ackRxPPacket.getSrcPort(), ackRxPPacket.getDestPort());
+            return null;
+          }
+        }        
       }
     }
 
@@ -471,5 +570,106 @@ public class RxPSocket {
     }
 
     return receivedBytes;
+  }
+
+  public boolean sendRxPPackets(RxPPacket[] rxpPacketsToSend) {
+
+    int oldestUnackedPointer = 0;
+    boolean PSH_ACKsent = false;
+
+    // Set a receive timeout so we can resend after a time, rather
+    // than just having it block
+    int timeoutMillis = 300;
+    try {
+      dgSocket.setSoTimeout(timeoutMillis);
+    } catch(SocketException se) {
+      // TODO: Add error handling
+    }
+
+    // The timer task is charged with resending all packets in the window
+    // every time it is fired. It needs to be encapsulated in a class because
+    // Async tasks need to work on constants, not variables.
+    Timer timer = new Timer();
+
+    // Resend the current data every 300ms there is not an ACKed packet.
+    ResendTimerTask resendTask = new ResendTimerTask(oldestUnackedPointer, windowSize, rxpPacketsToSend);
+    timer.scheduleAtFixedRate(resendTask, 0, timeoutMillis);
+
+    // TODO: 2) Set Window Size
+    byte[] packetPayload = new byte[RxPPacket.DEFAULT_PACKET_SIZE];
+    DatagramPacket dgPacket = new DatagramPacket(packetPayload, packetPayload.length);
+
+    while (true) {
+      try {
+        // Wait for the ACK
+        dgSocket.receive(dgPacket);
+
+        resendTask.resetTimesNoResponse();
+        RxPPacket rxpPacket = new RxPPacket(dgPacket);
+
+        if (!rxpPacket.isSYN() && rxpPacket.isACK()) {
+
+          int ackNumber = rxpPacket.getACKNum();
+          int expectedAckNumber = rxpPacketsToSend[oldestUnackedPointer].getSeqNum();
+          System.out.println("ACK Received: " + ackNumber);
+
+          // If FIN ACK?
+          if (connectionManager.updateConnection(rxpPacket)) {
+
+            System.out.println("Received FIN ACK");
+            timer.cancel();
+            timer.purge();
+            resendTask.cancel();
+            return true;
+          }
+
+          // If the ACK is equal to the oldest unACKed packet, move the index by one
+          // Otherwise, wait until it comes OR timeout occurs.
+          if (oldestUnackedPointer < rxpPacketsToSend.length &&
+              ackNumber == expectedAckNumber) {
+            oldestUnackedPointer++;
+            boolean success = resendTask.incrementOldestUnackedPointer();
+
+            // Reset timer
+            timer.cancel();
+            timer.purge();
+            timer = new Timer();
+            resendTask = new ResendTimerTask(oldestUnackedPointer, windowSize, rxpPacketsToSend);
+            timer.scheduleAtFixedRate(resendTask, timeoutMillis, timeoutMillis);
+          }
+
+          if (rxpPacket.isPSH() && ackNumber == expectedAckNumber) {
+            // If the received packet is a PSH+ACK, then send a PSH+ACK and quit.
+            RxPPacket ackRxPPacket = new RxPPacket();
+            ackRxPPacket.setACK(true);
+            ackRxPPacket.setACKNum(rxpPacket.getACKNum()+1);
+            ackRxPPacket.setSeqNum(rxpPacket.getACKNum()+1);
+            ackRxPPacket.setDestPort((short)dgPacket.getPort());
+            ackRxPPacket.setSrcPort((short)dgSocket.getLocalPort());
+            ackRxPPacket.setPSH(true);
+            ackRxPPacket.setChecksum(ackRxPPacket.calculateChecksum());
+
+            // Send ACK+PSH
+            DatagramPacket dg = ackRxPPacket.asDatagramPacket();
+            dg.setAddress(dgPacket.getAddress());
+            dg.setPort(dgPacket.getPort());
+            dgSocket.send(dg);
+            System.out.println("Sending PSH+ACK");
+            timer.cancel();
+            timer.purge();
+            resendTask.cancel();
+            return true;
+          }
+        }
+      } catch(IOException e) {
+        System.err.println("Received Nothing " + resendTask.getNumTimesNoResponse() + " Times");
+        if (resendTask.getNumTimesNoResponse() == 40) {
+          timer.cancel();
+          timer.purge();
+          resendTask.cancel();
+          return false;
+        }
+      }
+    }
   }
 }

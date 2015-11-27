@@ -148,6 +148,7 @@ class CLILoop implements Callable<Object> {
 
   private void disconnect() {
     // TODO: Implement
+    socket.close();
   }
 
   private void setWindowSize(int windowSize) {
