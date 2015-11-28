@@ -104,11 +104,10 @@ class ReceiveLoop implements Callable<Object> {
       	// Make receive break when socket.isClientSending
       	// must make sure receive knows that it is a client socket
 
-      	// System.out.println("isClientSending: " + this.socket.isClientSending);
+      	System.out.println("isClientSending: " + this.socket.isClientSending);
       	if (!this.socket.isClientSending) {
       		
       		try {
-	    		System.out.println("ReceiveLoop isSending: " + this.socket.isClientSending);
 		    	this.socket.receiveInBackground();
 		    } catch (IOException ioe) {
 	      	}	

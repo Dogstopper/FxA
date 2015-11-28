@@ -663,7 +663,26 @@ public class RxPSocket {
         System.out.println("Terminate");
 
         // ACK & call close()
+        if (666 == receivedRxPPacket.getSeqNum() && !receivedRxPPacket.isACK()) {
+          
+          // Make an ACK
+          RxPPacket ackRxPPacket = new RxPPacket();
+          ackRxPPacket.setACK(true);
+          ackRxPPacket.setACKNum(receivedRxPPacket.getSeqNum());
+          ackRxPPacket.setDestPort((short)dgPacket.getPort());
+          ackRxPPacket.setSrcPort((short)dgSocket.getLocalPort());
+          ackRxPPacket.setChecksum(ackRxPPacket.calculateChecksum());
 
+          // Send ACK
+          DatagramPacket dg = ackRxPPacket.asDatagramPacket();
+          dg.setAddress(dgPacket.getAddress());
+          dg.setPort(dgPacket.getPort());
+          dgSocket.send(dg);
+
+          System.out.println("Sending ACK: " + ackRxPPacket.getACKNum());
+
+          // this.close()
+        }
       } else if (!connectionManager.isTerminatePacket(receivedRxPPacket)) {
 
         // if not terminate packet, break
@@ -844,6 +863,19 @@ public class RxPSocket {
           if (connectionManager.updateConnection(rxpPacket)) {
 
             System.out.println("Received FIN ACK");
+            timer.cancel();
+            timer.purge();
+            resendTask.cancel();
+            this.isClientSending = false;
+            return true;
+          }
+
+          // if the ACK is responding to a terminate packet return true
+          if (oldestUnackedPointer < rxpPacketsToSend.length && ackNumber == 666) {
+
+            System.out.println("Terminate ACK Received");
+            oldestUnackedPointer++;
+            // Reset timer
             timer.cancel();
             timer.purge();
             resendTask.cancel();
