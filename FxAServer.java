@@ -42,6 +42,7 @@ public class FxAServer {
   public void terminate() {
     System.out.println("TERMINATE");
     // TODO: Disconnect server.
+    socket.terminate();
   }
 
 	public static void main(String[] args) throws IOException, InterruptedException {
