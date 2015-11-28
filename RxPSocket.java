@@ -449,8 +449,13 @@ public class RxPSocket {
       if (currentChecksum != checksum) {
         System.out.println("Packet Corrupted");
         continue;
-      }
-      else if (!connectionManager.getConnection(receivedRxPPacket).isAllowedToSendData() && updateConnection) {
+      } else if (connectionManager.isTerminatePacket(receivedRxPPacket)) {
+
+        System.out.println("Terminate");
+
+        // ACK & call close()
+
+      } else if (!connectionManager.getConnection(receivedRxPPacket).isAllowedToSendData() && updateConnection) {
         System.out.println("Update Connection: " + true);
         // If the client is still waiting for the fifth handshake, process that instead.
         Connection connection = connectionManager.getConnection(receivedRxPPacket);
@@ -570,6 +575,13 @@ public class RxPSocket {
     }
 
     return receivedBytes;
+  }
+
+  public void terminate() {
+
+    Connection myConnection = connectionManager.getConnection(this.srcPort, this.destPort);
+    RxPPacket terminateRxPPacket = connectionManager.getTerminatePacket(myConnection);
+    sendRxPPackets(new RxPPacket[] { terminateRxPPacket });
   }
 
   public boolean sendRxPPackets(RxPPacket[] rxpPacketsToSend) {

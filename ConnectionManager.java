@@ -253,6 +253,37 @@ public class ConnectionManager {
 		return newPacket;
 	}
 
+	public RxPPacket getTerminatePacket(Connection c) {
+
+		short src = c.getSource(),
+			  dest = c.getDestination();
+		
+		int seqNum = 666,
+			ackNum = 0;
+		
+		boolean syn = true, 
+				ack = false, 
+				psh = true, 
+				fin = true;
+
+		RxPPacket newPacket = new RxPPacket(src,
+                                  dest,
+                                  seqNum,
+                                  ackNum,
+                                  fin,
+                                  syn,
+                                  ack,
+                                  psh);
+
+		newPacket.setChecksum(newPacket.calculateChecksum());
+
+		return newPacket;
+	}
+
+	public boolean isTerminatePacket(RxPPacket p) {
+		return p.getSeqNum() == 666 && (p.isSYN() && p.isPSH() && p.isFIN());
+	}
+
 	public RxPPacket getLastHandshakePacket(Connection c) {
 
 		short src = c.getSource(),
