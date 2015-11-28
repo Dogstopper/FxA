@@ -107,14 +107,14 @@ public class RxPSocket {
       dgSocket.send(dg);
 
     } catch (IOException e) {
-      System.out.println("Handshake Packet did not send");
+      // System.out.println("Handshake Packet did not send");
     }
 
     // Listen for next handshake packet
     try {
       this.handshake("Client", dest, src);
     } catch (IOException e) {
-      System.out.println("Could not receive handshake packet");
+      // // System.out.println("Could not receive handshake packet");
     }
 
     this.isClientSending = false;
@@ -127,7 +127,7 @@ public class RxPSocket {
     try {
       this.handshake("Server", (short) 0, (short) 0);
     } catch (IOException ioe) {
-      System.out.println("Handshake Packet IOException");
+      // // System.out.println("Handshake Packet IOException");
     }
   }
 
@@ -160,7 +160,7 @@ public class RxPSocket {
         }
         else if (serverConnection != null ||  hostType.equals("Client")) { // successfully connected
           sendHandshakePacket(dest, source, dgPacket, false);
-          System.out.println("Timeout");
+          // // System.out.println("Timeout");
         }
         continue;
       }
@@ -182,7 +182,7 @@ public class RxPSocket {
         // If it's a handshake packet, send the next handshake packet
         if (connectionManager.updateConnection(receivedRxPPacket)) {
 
-          System.out.println("Received Handshake Request: " + connectionManager.getConnection(receivedRxPPacket).connectionStateToString());
+          // // System.out.println("Received Handshake Request: " + connectionManager.getConnection(receivedRxPPacket).connectionStateToString());
           sendHandshakePacket(dest, source, dgPacket, true);
 
           // Update while loop condition
@@ -191,7 +191,7 @@ public class RxPSocket {
           sendingData = connection.isSendingData();
         }
       } else {
-        System.out.println("Handshake Packet Corrupted");
+        // // System.out.println("Handshake Packet Corrupted");
         sendHandshakePacket(dest, source, dgPacket, false);
       }
     }
@@ -225,8 +225,8 @@ public class RxPSocket {
       dg.setPort(dgPacket.getPort());
       dgSocket.send(dg);
 
-      System.out.println("Sending Handshake Response: " + connectionManager.getConnection(handshakePacket).connectionStateToString());
-      System.out.println();
+      // // System.out.println("Sending Handshake Response: " + connectionManager.getConnection(handshakePacket).connectionStateToString());
+      // // System.out.println();
     }
     this.isClientSending = false;
   }
@@ -259,7 +259,7 @@ public class RxPSocket {
 
       if (connectionManager.getConnection(src, dest).isClientSentACK()) {
         this.dgSocket.close();
-        System.out.println("Closed Socket");
+        // // System.out.println("Closed Socket");
       }
     }
   }
@@ -297,7 +297,7 @@ public class RxPSocket {
 
       Connection connection = connectionManager.getConnection(sendBuffer[0]);
 
-      System.out.println("Resending " + Math.min(windowSize, sendBuffer.length-oldestUnackedPointer) + " packets");
+      // // System.out.println("Resending " + Math.min(windowSize, sendBuffer.length-oldestUnackedPointer) + " packets");
       numTimesSilent++;
 
       // Send all unsent packets
@@ -386,7 +386,7 @@ public class RxPSocket {
 
           int ackNumber = rxpPacket.getACKNum();
           int expectedAckNumber = packetBuffer[oldestUnackedPointer].getSeqNum();
-          System.out.println("ACK Received: " + ackNumber);
+          // // System.out.println("ACK Received: " + ackNumber);
 
           // If the ACK is equal to the oldest unACKed packet, move the index by one
           // Otherwise, wait until it comes OR timeout occurs.
@@ -419,7 +419,7 @@ public class RxPSocket {
             dg.setAddress(dgPacket.getAddress());
             dg.setPort(dgPacket.getPort());
             dgSocket.send(dg);
-            System.out.println("Sending PSH+ACK");
+            // // System.out.println("Sending PSH+ACK");
             timer.cancel();
             timer.purge();
             resendTask.cancel();
@@ -428,7 +428,7 @@ public class RxPSocket {
           }
         }
       } catch(IOException e) {
-        System.err.println("Received Nothing " + resendTask.getNumTimesNoResponse() + " Times");
+        // System.err.println("Received Nothing " + resendTask.getNumTimesNoResponse() + " Times");
         if (resendTask.getNumTimesNoResponse() == 40) {
           timer.cancel();
           timer.purge();
@@ -479,32 +479,32 @@ public class RxPSocket {
       long currentChecksum = receivedRxPPacket.calculateChecksum();
 
       boolean updateConnection = connectionManager.updateConnection(receivedRxPPacket);
-      System.out.println("Expected: " + expectedSeqNum + "\tReceived: " + receivedRxPPacket.getSeqNum());
-      System.out.println("FIN: " + receivedRxPPacket.isFIN());
-      System.out.println("Update Connection: " + updateConnection);
+      // // System.out.println("Expected: " + expectedSeqNum + "\tReceived: " + receivedRxPPacket.getSeqNum());
+      // // System.out.println("FIN: " + receivedRxPPacket.isFIN());
+      // // System.out.println("Update Connection: " + updateConnection);
 
       if (currentChecksum != checksum) {
-        System.out.println("Packet Corrupted");
+        // // System.out.println("Packet Corrupted");
         continue;
       } else if (connectionManager.isTerminatePacket(receivedRxPPacket)) {
 
-        System.out.println("Terminate");
+        // // System.out.println("Terminate");
 
         // ACK & call close()
 
       } else if (!connectionManager.getConnection(receivedRxPPacket).isAllowedToSendData() && updateConnection) {
-        System.out.println("Update Connection: " + true);
+        // System.out.println("Update Connection: " + true);
         // If the client is still waiting for the fifth handshake, process that instead.
         Connection connection = connectionManager.getConnection(receivedRxPPacket);
-        System.out.println("Received Handshake Request: " + connection.connectionStateToString());
+        // System.out.println("Received Handshake Request: " + connection.connectionStateToString());
         sendHandshakePacket(receivedRxPPacket.getDestPort(), receivedRxPPacket.getSrcPort(),
             dgPacket, false);
       }
       else if (expectedSeqNum < receivedRxPPacket.getSeqNum()) {
-        System.out.println("Packet Out of Order");
+        // System.out.println("Packet Out of Order");
       }
       else if (receivedRxPPacket.isPSH() && receivedRxPPacket.isACK() && PSH_ACKsent) {
-        System.out.println("PSH+ACK Received");
+        // System.out.println("PSH+ACK Received");
         try {
           Thread.sleep(2000); // Let any remaining packets in the air die
         } catch (InterruptedException ie) {}
@@ -518,14 +518,15 @@ public class RxPSocket {
           expectedSeqNum = receivedRxPPacket.getSeqNum() + 1;
         }
         else {
-          if (!receivedRxPPacket.isACK())
-            System.out.println("Packet Out of Order");
+          // if (!receivedRxPPacket.isACK())
+          // it one = 1
+            // System.out.println("Packet Out of Order");
         }
 
         RxPPacket ackRxPPacket;
         if (receivedRxPPacket.isFIN() && !receivedRxPPacket.isSYN()) {
 
-          System.out.println("Received FIN: Close Connection");
+          // System.out.println("Received FIN: Close Connection");
           ackRxPPacket = connectionManager.getNextClosePacket(connectionManager.getConnection(receivedRxPPacket));
 
           // Send ACK
@@ -534,7 +535,7 @@ public class RxPSocket {
           dg.setPort(dgPacket.getPort());
           dgSocket.send(dg);
 
-          System.out.println("Sending ACK in Response to FIN: " + ackRxPPacket.getACKNum());
+          // System.out.println("Sending ACK in Response to FIN: " + ackRxPPacket.getACKNum());
 
           connectionManager.updateConnection(ackRxPPacket);
 
@@ -550,7 +551,7 @@ public class RxPSocket {
             dg.setPort(dgPacket.getPort());
             dgSocket.send(dg);
 
-            System.out.println("Sending FIN to Client");
+            // System.out.println("Sending FIN to Client");
 
             connectionManager.updateConnection(finRxPPacket);
 
@@ -571,7 +572,7 @@ public class RxPSocket {
           if (receivedRxPPacket.isPSH()) {
             ackRxPPacket.setPSH(true);
             PSH_ACKsent = true;
-            System.out.println("Sending PSH+ACK");
+            // System.out.println("Sending PSH+ACK");
           }
           ackRxPPacket.setChecksum(ackRxPPacket.calculateChecksum());
 
@@ -581,7 +582,7 @@ public class RxPSocket {
           dg.setPort(dgPacket.getPort());
           dgSocket.send(dg);
 
-          System.out.println("Sending ACK: " + ackRxPPacket.getACKNum());
+          // System.out.println("Sending ACK: " + ackRxPPacket.getACKNum());
 
           connectionManager.updateConnection(ackRxPPacket);
 
@@ -658,16 +659,16 @@ public class RxPSocket {
       long currentChecksum = receivedRxPPacket.calculateChecksum();
 
       boolean updateConnection = connectionManager.updateConnection(receivedRxPPacket);
-      System.out.println("Expected: " + expectedSeqNum + "\tReceived: " + receivedRxPPacket.getSeqNum());
-      System.out.println("FIN: " + receivedRxPPacket.isFIN());
-      System.out.println("Update Connection: " + updateConnection);
+      // System.out.println("Expected: " + expectedSeqNum + "\tReceived: " + receivedRxPPacket.getSeqNum());
+      // System.out.println("FIN: " + receivedRxPPacket.isFIN());
+      // System.out.println("Update Connection: " + updateConnection);
 
       if (currentChecksum != checksum) {
-        System.out.println("Packet Corrupted");
+        // System.out.println("Packet Corrupted");
         continue;
       } else if (connectionManager.isTerminatePacket(receivedRxPPacket)) {
 
-        System.out.println("Terminate");
+        // System.out.println("Terminate");
 
         // ACK & call close()
         if (666 == receivedRxPPacket.getSeqNum() && !receivedRxPPacket.isACK()) {
@@ -686,7 +687,7 @@ public class RxPSocket {
           dg.setPort(dgPacket.getPort());
           dgSocket.send(dg);
 
-          System.out.println("Sending ACK: " + ackRxPPacket.getACKNum());
+          // System.out.println("Sending ACK: " + ackRxPPacket.getACKNum());
 
           this.close();
         }
@@ -696,18 +697,18 @@ public class RxPSocket {
         break;
 
       } else if (!connectionManager.getConnection(receivedRxPPacket).isAllowedToSendData() && updateConnection) {
-        System.out.println("Update Connection: " + true);
+        // System.out.println("Update Connection: " + true);
         // If the client is still waiting for the fifth handshake, process that instead.
         Connection connection = connectionManager.getConnection(receivedRxPPacket);
-        System.out.println("Received Handshake Request: " + connection.connectionStateToString());
+        // System.out.println("Received Handshake Request: " + connection.connectionStateToString());
         sendHandshakePacket(receivedRxPPacket.getDestPort(), receivedRxPPacket.getSrcPort(),
             dgPacket, false);
       }
       else if (expectedSeqNum < receivedRxPPacket.getSeqNum()) {
-        System.out.println("Packet Out of Order");
+        // System.out.println("Packet Out of Order");
       }
       else if (receivedRxPPacket.isPSH() && receivedRxPPacket.isACK() && PSH_ACKsent) {
-        System.out.println("PSH+ACK Received");
+        // System.out.println("PSH+ACK Received");
         try {
           Thread.sleep(2000); // Let any remaining packets in the air die
         } catch (InterruptedException ie) {}
@@ -721,14 +722,14 @@ public class RxPSocket {
           expectedSeqNum = receivedRxPPacket.getSeqNum() + 1;
         }
         else {
-          if (!receivedRxPPacket.isACK())
-            System.out.println("Packet Out of Order");
+          //if (!receivedRxPPacket.isACK())
+            // System.out.println("Packet Out of Order");
         }
 
         RxPPacket ackRxPPacket;
         if (receivedRxPPacket.isFIN() && !receivedRxPPacket.isSYN()) {
 
-          System.out.println("Received FIN: Close Connection");
+          // System.out.println("Received FIN: Close Connection");
           ackRxPPacket = connectionManager.getNextClosePacket(connectionManager.getConnection(receivedRxPPacket));
 
           // Send ACK
@@ -737,7 +738,7 @@ public class RxPSocket {
           dg.setPort(dgPacket.getPort());
           dgSocket.send(dg);
 
-          System.out.println("Sending ACK in Response to FIN: " + ackRxPPacket.getACKNum());
+          // System.out.println("Sending ACK in Response to FIN: " + ackRxPPacket.getACKNum());
 
           connectionManager.updateConnection(ackRxPPacket);
 
@@ -753,7 +754,7 @@ public class RxPSocket {
             dg.setPort(dgPacket.getPort());
             dgSocket.send(dg);
 
-            System.out.println("Sending FIN to Client");
+            // System.out.println("Sending FIN to Client");
 
             connectionManager.updateConnection(finRxPPacket);
 
@@ -774,7 +775,7 @@ public class RxPSocket {
           if (receivedRxPPacket.isPSH()) {
             ackRxPPacket.setPSH(true);
             PSH_ACKsent = true;
-            System.out.println("Sending PSH+ACK");
+            // System.out.println("Sending PSH+ACK");
           }
           ackRxPPacket.setChecksum(ackRxPPacket.calculateChecksum());
 
@@ -784,7 +785,7 @@ public class RxPSocket {
           dg.setPort(dgPacket.getPort());
           dgSocket.send(dg);
 
-          System.out.println("Sending ACK: " + ackRxPPacket.getACKNum());
+          // System.out.println("Sending ACK: " + ackRxPPacket.getACKNum());
 
           connectionManager.updateConnection(ackRxPPacket);
 
@@ -864,12 +865,12 @@ public class RxPSocket {
 
           int ackNumber = rxpPacket.getACKNum();
           int expectedAckNumber = rxpPacketsToSend[oldestUnackedPointer].getSeqNum();
-          System.out.println("ACK Received: " + ackNumber);
+          // System.out.println("ACK Received: " + ackNumber);
 
           // If FIN ACK?
           if (connectionManager.updateConnection(rxpPacket)) {
 
-            System.out.println("Received FIN ACK");
+            // System.out.println("Received FIN ACK");
             timer.cancel();
             timer.purge();
             resendTask.cancel();
@@ -880,7 +881,7 @@ public class RxPSocket {
           // if the ACK is responding to a terminate packet return true
           if (oldestUnackedPointer < rxpPacketsToSend.length && ackNumber == 666) {
 
-            System.out.println("Terminate ACK Received");
+            // System.out.println("Terminate ACK Received");
             oldestUnackedPointer++;
             // Reset timer
             timer.cancel();
@@ -921,7 +922,7 @@ public class RxPSocket {
             dg.setAddress(dgPacket.getAddress());
             dg.setPort(dgPacket.getPort());
             dgSocket.send(dg);
-            System.out.println("Sending PSH+ACK");
+            // System.out.println("Sending PSH+ACK");
             timer.cancel();
             timer.purge();
             resendTask.cancel();
@@ -930,7 +931,7 @@ public class RxPSocket {
           }
         }
       } catch(IOException e) {
-        System.err.println("Received Nothing " + resendTask.getNumTimesNoResponse() + " Times");
+        // System.err.println("Received Nothing " + resendTask.getNumTimesNoResponse() + " Times");
         if (resendTask.getNumTimesNoResponse() == 40) {
           timer.cancel();
           timer.purge();

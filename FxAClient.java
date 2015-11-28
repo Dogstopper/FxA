@@ -49,12 +49,6 @@ public class FxAClient {
     this.isConnected = c;
   }
 
-  public void terminate() throws InterruptedException {
-    this.service.shutdownNow();
-    this.service.awaitTermination(5, TimeUnit.SECONDS);
-    Thread.currentThread().interrupt();
-  }
-
 	public static void main(String args[]) throws Exception {
     int inPort;
     int inNetEmuPort;
@@ -171,14 +165,7 @@ class CLILoop implements Callable<Object> {
   private void disconnect() {
     // TODO: Implement
     socket.close();
-    try {
-      client.terminate();
-    } catch(InterruptedException ie) {
-      System.err.println(ie.getMessage());
-    }
-    finally {
-      System.exit(0);
-    }
+    System.exit(0);
   }
 
   private void setWindowSize(int windowSize) {
@@ -242,13 +229,13 @@ class CLILoop implements Callable<Object> {
       newFile.read(file);
       newFile.close();
 
-      System.out.println("File Read. Num Bytes="+file.length);
+      //System.out.println("File Read. Num Bytes="+file.length);
 
       // Send it.
       FileMsg request = new FileMsg(false, filename, file);
       byte[] encodeMsg = coder.toWire(request);
-      System.out.println("File Encoded. Num Bytes="+encodeMsg.length);
-      System.out.println("File Encoded. "+new String(encodeMsg));
+      //System.out.println("File Encoded. Num Bytes="+encodeMsg.length);
+      //System.out.println("File Encoded. "+new String(encodeMsg));
       while (!socket.send(encodeMsg));
 
       System.out.println("\n\nFile Uploaded. Verifying success");

@@ -49,22 +49,22 @@ public class ConnectionManager {
 	}
 
 	public boolean updateConnection(RxPPacket packet) {
-		System.out.println(this.getConnectionPacketStatus(packet));
+		// System.out.print.println(this.getConnectionPacketStatus(packet));
 
 		boolean connectionUpdated = false; // return this
 
 		Connection c = this.getConnection(packet);
 
-		/* Establishing Connection */ 
+		/* Establishing Connection */
 
 		if (!c.isTryingToEstablish()) {
-			
+
 			// Does packet contain JUST a SYN?
 			if (packet.isSYN() && !packet.isACK() && !packet.isPSH() && !packet.isFIN()) {
-				
-				c.setTryingToEstablish(true); 
+
+				c.setTryingToEstablish(true);
 				connectionUpdated = true;
-				System.out.println("updated: setTryingToEstablish");
+				// System.out.print.println("updated: setTryingToEstablish");
 			}
 		}
 
@@ -73,10 +73,10 @@ public class ConnectionManager {
 
 			// Does packet contain JUST a SYN - ACK?
 			if (packet.isSYN() && packet.isACK() && !packet.isPSH() && !packet.isFIN()) {
-				
-				c.setAboutToEstablish(true); 
+
+				c.setAboutToEstablish(true);
 				connectionUpdated = true;
-				System.out.println("updated: setAboutToEstablish");
+				// System.out.print.println("updated: setAboutToEstablish");
 			}
 		}
 
@@ -85,10 +85,10 @@ public class ConnectionManager {
 
 			// Does packet contain JUST a SYN - ACK - PSH?
 			if (packet.isSYN() && packet.isACK() && packet.isPSH() && !packet.isFIN()) {
-				
-				c.setEstablished(true); 
+
+				c.setEstablished(true);
 				connectionUpdated = true;
-				System.out.println("updated: setEstablished");
+				// System.out.print.println("updated: setEstablished");
 			}
 		}
 
@@ -97,10 +97,10 @@ public class ConnectionManager {
 
 			// Does packet contain JUST a SYN - ACK - PSH - FIN?
 			if (packet.isSYN() && packet.isACK() && packet.isPSH() && packet.isFIN()) {
-				
-				c.setAllowedToSendData(true); 
+
+				c.setAllowedToSendData(true);
 				connectionUpdated = true;
-				System.out.println("updated: setAllowedToSendData");
+				// System.out.print.println("updated: setAllowedToSendData");
 			}
 		}
 
@@ -109,10 +109,10 @@ public class ConnectionManager {
 
 			// Does packet contain JUST a SYN - ACK - FIN?
 			if (packet.isSYN() && packet.isACK() && !packet.isPSH() && packet.isFIN()) {
-				
-				c.setSendingData(true); 
+
+				c.setSendingData(true);
 				connectionUpdated = true;
-				System.out.println("updated: setSendingData");
+				// System.out.print.println("updated: setSendingData");
 			}
 		}
 
@@ -121,58 +121,58 @@ public class ConnectionManager {
 		if (!c.isClientSentFIN()) {
 
 			if (packet.isFIN() && !packet.isACK() && !packet.isSYN()) {
-				
+
 				c.setClientSentFIN(true);
 				connectionUpdated = true;
-				System.out.println("updated: setClientSentFIN");
+				// System.out.print.println("updated: setClientSentFIN");
 			}
 		}
 
 		if (c.isClientSentFIN() && !c.isServerSentACK()) {
 
 			if (!packet.isFIN() && packet.isACK()) {
-				
+
 				c.setServerSentACK(true);
 				connectionUpdated = true;
-				System.out.println("updated: setServerSentACK");
+				// System.out.print.println("updated: setServerSentACK");
 			}
 		}
 
 		if (c.isClientSentFIN() && c.isServerSentACK() && !c.isServerSentFIN()) {
 
 			if (packet.isFIN() && !packet.isACK()) {
-				
+
 				c.setServerSentFIN(true);
 				connectionUpdated = true;
-				System.out.println("updated: setServerSentFIN");
+				// System.out.print.println("updated: setServerSentFIN");
 			}
 		}
 
 		if (c.isClientSentFIN() && c.isServerSentACK() && c.isServerSentFIN() && !c.isClientSentACK()) {
 
 			if (!packet.isFIN() && packet.isACK()) {
-				
+
 				c.setClientSentACK(true);
 				connectionUpdated = true;
-				System.out.println("updated: setClientSentACK");
+				// System.out.print.println("updated: setClientSentACK");
 			}
 		}
-		
-		System.out.println("connectionUpdated: " + connectionUpdated);
+
+		// System.out.print.println("connectionUpdated: " + connectionUpdated);
 		return connectionUpdated;
-	} 
+	}
 
 	public RxPPacket getNextHandshakePacket(Connection c) {
 
 		short src = c.getSource(),
 			  dest = c.getDestination();
-		
+
 		int seqNum = 0,
 			ackNum = 0;
-		
-		boolean syn = false, 
-				ack = false, 
-				psh = false, 
+
+		boolean syn = false,
+				ack = false,
+				psh = false,
 				fin = false;
 
 		// If the initiater of the handshake receives a connection established flag, DO NOT send anymore handshake packets
@@ -181,7 +181,7 @@ public class ConnectionManager {
 		// }
 
 		if (!c.isTryingToEstablish()) {
-			
+
 			seqNum = 1;
 
 			syn = true;
@@ -189,7 +189,7 @@ public class ConnectionManager {
 			// This is the beginning of the handshake
 			c.setIsClient(true);
 
-			System.out.println("TryingToEstablish");
+			// System.out.print.println("TryingToEstablish");
 		}
 
 		// Connection could be entering "About To Establish" state
@@ -200,19 +200,19 @@ public class ConnectionManager {
 			syn = true;
 			ack = true;
 
-			System.out.println("AboutToEstablish");
+			// System.out.print.println("AboutToEstablish");
 		}
 
 		// Connection could be entering "Establish" state
 		if (c.isClient() && (c.isTryingToEstablish() && c.isAboutToEstablish() && !c.isEstablished())) {
 
-			seqNum = 3; 
+			seqNum = 3;
 
 			syn = true;
 			ack = true;
 			psh = true;
 
-			System.out.println("Established");
+			// System.out.print.println("Established");
 		}
 
 		// Connection could be entering "Allowed To Send Data" state
@@ -224,7 +224,7 @@ public class ConnectionManager {
 			ack = true;
 			psh = true;
 			fin = true;
-			System.out.println("AllowedToSendData");
+			// System.out.print.println("AllowedToSendData");
 		}
 
 		// Connection could be entering "Sending Data" state
@@ -236,7 +236,7 @@ public class ConnectionManager {
 			ack = true;
 			psh = false;
 			fin = true;
-			System.out.println("SendingData");
+			// System.out.print.println("SendingData");
 		}
 
 		RxPPacket newPacket = new RxPPacket(src,
@@ -257,13 +257,13 @@ public class ConnectionManager {
 
 		short src = c.getSource(),
 			  dest = c.getDestination();
-		
+
 		int seqNum = 666,
 			ackNum = 0;
-		
-		boolean syn = true, 
-				ack = false, 
-				psh = true, 
+
+		boolean syn = true,
+				ack = false,
+				psh = true,
 				fin = true;
 
 		RxPPacket newPacket = new RxPPacket(src,
@@ -288,18 +288,18 @@ public class ConnectionManager {
 
 		short src = c.getSource(),
 			  dest = c.getDestination();
-		
+
 		int seqNum = 0,
 			ackNum = 0;
-		
-		boolean syn = false, 
-				ack = false, 
-				psh = false, 
+
+		boolean syn = false,
+				ack = false,
+				psh = false,
 				fin = false;
 
 
 		if (c.isTryingToEstablish() && !c.isAboutToEstablish()) {
-			
+
 			seqNum = 1;
 
 			syn = true;
@@ -307,7 +307,7 @@ public class ConnectionManager {
 			// This is the beginning of the handshake
 			c.setIsClient(true);
 
-			System.out.println("TryingToEstablish");
+			// System.out.print.println("TryingToEstablish");
 		}
 
 		// Connection could be entering "About To Establish" state
@@ -318,19 +318,19 @@ public class ConnectionManager {
 			syn = true;
 			ack = true;
 
-			System.out.println("AboutToEstablish");
+			// System.out.print.println("AboutToEstablish");
 		}
 
 		// Connection could be entering "Establish" state
 		if (c.isClient() && (c.isTryingToEstablish() && c.isAboutToEstablish() && c.isEstablished() && !c.isAllowedToSendData())) {
 
-			seqNum = 3; 
+			seqNum = 3;
 
 			syn = true;
 			ack = true;
 			psh = true;
 
-			System.out.println("Established");
+			// System.out.print.println("Established");
 		}
 
 		// Connection could be entering "Allowed To Send Data" state
@@ -342,7 +342,7 @@ public class ConnectionManager {
 			ack = true;
 			psh = true;
 			fin = true;
-			System.out.println("AllowedToSendData");
+			// System.out.print.println("AllowedToSendData");
 		}
 
 		// Connection could be entering "Sending Data" state
@@ -354,7 +354,7 @@ public class ConnectionManager {
 			ack = true;
 			psh = false;
 			fin = true;
-			System.out.println("SendingData");
+			// System.out.print.println("SendingData");
 		}
 
 		RxPPacket newPacket = new RxPPacket(src,
@@ -379,22 +379,22 @@ public class ConnectionManager {
 
 		short src = c.getSource(),
 			  dest = c.getDestination();
-		
+
 		int seqNum = 0,
 			ackNum = 0;
-		
-		boolean syn = false, 
-				ack = false, 
-				psh = false, 
+
+		boolean syn = false,
+				ack = false,
+				psh = false,
 				fin = false;
 
 		if (c.isClient() && !c.isClientSentFIN()) {
-			
+
 			seqNum = 1;
 
 			fin = true;
 
-			System.out.println("ClientSendingFIN");
+			// System.out.print.println("ClientSendingFIN");
 		}
 
 		if (!c.isClient() && (c.isClientSentFIN() && !c.isServerSentACK())) {
@@ -404,16 +404,16 @@ public class ConnectionManager {
 
 			ack = true;
 
-			System.out.println("ServerSendingACK");
+			// System.out.print.println("ServerSendingACK");
 		}
 
 		if (!c.isClient() && (c.isClientSentFIN() && c.isServerSentACK() && !c.isServerSentFIN())) {
 
-			seqNum = 1; 
+			seqNum = 1;
 
 			fin = true;
 
-			System.out.println("ServerSendingFin");
+			// System.out.print.println("ServerSendingFin");
 		}
 
 		if (c.isClient() && (c.isClientSentFIN() && c.isServerSentACK() && c.isServerSentFIN() && !c.isClientSentACK())) {
@@ -423,7 +423,7 @@ public class ConnectionManager {
 
 			ack = true;
 
-			System.out.println("ClientSendingACK");
+			// System.out.print.println("ClientSendingACK");
 		}
 
 		RxPPacket newPacket = new RxPPacket(src,
@@ -459,9 +459,9 @@ public class ConnectionManager {
 		String str = "isClient: " + c.isClient()
 				   + "\nisClientSentFIN: " + c.isClientSentFIN()
 				   + "\nisServerSentACK: " + c.isServerSentACK()
-				   + "\nisServerSentFIN: " + c.isServerSentFIN() 
+				   + "\nisServerSentFIN: " + c.isServerSentFIN()
 				   + "\nisClientSentACK: " + c.isClientSentACK()
-				   + "\nisFIN: " + p.isFIN() 
+				   + "\nisFIN: " + p.isFIN()
 				   + "\nisACK: " + p.isACK()
 				   + "\nisSYN: " + p.isSYN();
 

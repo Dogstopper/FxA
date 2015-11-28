@@ -42,7 +42,7 @@ public class FxAServer {
   public void terminate() {
     System.out.println("TERMINATE");
     // TODO: Disconnect server.
-    socket.terminate();
+    System.exit(0);
   }
 
 	public static void main(String[] args) throws IOException, InterruptedException {
@@ -218,7 +218,7 @@ class ServerLoop implements Callable<Object> {
     MsgCoder coder = new FileMsgTextCoder();
     FileService service = new FileService();
 
-    
+
     while (true) {
       try {
         byte[] inBuffer = null;
