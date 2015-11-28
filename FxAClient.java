@@ -19,7 +19,7 @@ public class FxAClient {
 
     // Creates Client's RxPSocket bound to Client's localhost and even port
     InetAddress localhost = InetAddress.getByName("127.0.0.1");
-    socket = new RxPSocket(port, localhost);
+    socket = RxPSocket.newRxPClientSocket(port, localhost);
 
     this.cliLoop = new CLILoop(socket, this, netEmuPort, netEmuInetAddress);
     this.receiveLoop = new ReceiveLoop(socket, this);
@@ -101,13 +101,18 @@ class ReceiveLoop implements Callable<Object> {
       MsgCoder coder = new FileMsgTextCoder();
       FileService service = new FileService();
       while (true) {
-        // TODO: brent - Make sure that you correctly use receive. If the
-        // client sends a request, we need to make sure that it does not
-        // intercept those events. OTher than that, go crazy.
-        // - Stephen
+      	// Make receive break when socket.isClientSending
+      	// must make sure receive knows that it is a client socket
 
-
-
+      	// System.out.println("isClientSending: " + this.socket.isClientSending);
+      	if (!this.socket.isClientSending) {
+      		
+      		try {
+	    		System.out.println("ReceiveLoop isSending: " + this.socket.isClientSending);
+		    	this.socket.receiveInBackground();
+		    } catch (IOException ioe) {
+	      	}	
+	    }
       }
     }
   }
