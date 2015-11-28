@@ -681,7 +681,7 @@ public class RxPSocket {
 
           System.out.println("Sending ACK: " + ackRxPPacket.getACKNum());
 
-          // this.close()
+          this.close();
         }
       } else if (!connectionManager.isTerminatePacket(receivedRxPPacket)) {
 
