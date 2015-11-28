@@ -22,6 +22,7 @@ public class RxPSocket {
   private InetAddress destAddress;
 
   public boolean isClient;
+  public boolean isConnected;
   public static boolean isClientSending;
 
   // TODO: Add a timer for timeouts.
@@ -31,6 +32,7 @@ public class RxPSocket {
     dgSocket = new DatagramSocket();
     connectionManager = new ConnectionManager();
     this.isClient = false;
+    this.isConnected = false;
   }
 
   public RxPSocket(int port) throws SocketException {
@@ -40,6 +42,7 @@ public class RxPSocket {
     dgSocket = new DatagramSocket(port);
     connectionManager = new ConnectionManager();
     this.isClient = false;
+    this.isConnected = false;
 	}
 
 	public RxPSocket(int port, InetAddress address) throws SocketException {
@@ -50,6 +53,7 @@ public class RxPSocket {
     dgSocket = new DatagramSocket(port, address);
     connectionManager = new ConnectionManager();
     this.isClient = false;
+    this.isConnected = false;
 	}
 
   public RxPSocket(boolean isClient, int port, InetAddress address) throws SocketException {
@@ -60,6 +64,7 @@ public class RxPSocket {
 
     dgSocket = new DatagramSocket(port, address);
     connectionManager = new ConnectionManager();
+    this.isConnected = false;
   }
 
   public static RxPSocket newRxPClientSocket(int port, InetAddress address) throws IOException {
@@ -76,6 +81,7 @@ public class RxPSocket {
 
   /* Connect, Send, and Receive Methods */
   public void connect(InetAddress address, int port) {
+    this.isConnected = true;
     this.isClientSending = true;
 
     this.destAddress = address;
@@ -229,6 +235,7 @@ public class RxPSocket {
   public void close() {
     this.closeClientConnection(this.srcPort, this.destPort);
     connectionManager.removeConnection(this.srcPort, this.destPort);
+    this.isConnected = false;
   }
 
   private void closeClientConnection(short src, short dest) {
@@ -240,7 +247,7 @@ public class RxPSocket {
       // Initial FIN Packet
       RxPPacket rxpPacketFIN = connectionManager.getNextClosePacket(connection);
       connectionManager.updateConnection(rxpPacketFIN);
-  
+
       // Send FIN Packet, will be ACK'd within send
       this.sendRxPPackets(new RxPPacket[] { rxpPacketFIN });
 
@@ -310,7 +317,7 @@ public class RxPSocket {
   // Application sends a buffer, send creates RxPPacket from buffer then...
   // TODO: send window of packets
   public boolean send(byte[] sendBuffer) {
-    
+
     this.isClientSending = true;
     int oldestUnackedPointer = 0;
     boolean PSH_ACKsent = false;
@@ -517,10 +524,10 @@ public class RxPSocket {
 
         RxPPacket ackRxPPacket;
         if (receivedRxPPacket.isFIN() && !receivedRxPPacket.isSYN()) {
-          
+
           System.out.println("Received FIN: Close Connection");
           ackRxPPacket = connectionManager.getNextClosePacket(connectionManager.getConnection(receivedRxPPacket));
-          
+
           // Send ACK
           DatagramPacket dg = ackRxPPacket.asDatagramPacket();
           dg.setAddress(dgPacket.getAddress());
@@ -554,7 +561,7 @@ public class RxPSocket {
             return null;
           }
         } else {
-        
+
           // Make an ACK
           ackRxPPacket = new RxPPacket();
           ackRxPPacket.setACK(true);
@@ -583,7 +590,7 @@ public class RxPSocket {
             // connectionManager.removeConnection(ackRxPPacket.getSrcPort(), ackRxPPacket.getDestPort());
             return null;
           }
-        }        
+        }
       }
     }
 
@@ -664,7 +671,7 @@ public class RxPSocket {
 
         // ACK & call close()
         if (666 == receivedRxPPacket.getSeqNum() && !receivedRxPPacket.isACK()) {
-          
+
           // Make an ACK
           RxPPacket ackRxPPacket = new RxPPacket();
           ackRxPPacket.setACK(true);
@@ -720,10 +727,10 @@ public class RxPSocket {
 
         RxPPacket ackRxPPacket;
         if (receivedRxPPacket.isFIN() && !receivedRxPPacket.isSYN()) {
-          
+
           System.out.println("Received FIN: Close Connection");
           ackRxPPacket = connectionManager.getNextClosePacket(connectionManager.getConnection(receivedRxPPacket));
-          
+
           // Send ACK
           DatagramPacket dg = ackRxPPacket.asDatagramPacket();
           dg.setAddress(dgPacket.getAddress());
@@ -757,7 +764,7 @@ public class RxPSocket {
             return null;
           }
         } else {
-        
+
           // Make an ACK
           ackRxPPacket = new RxPPacket();
           ackRxPPacket.setACK(true);
@@ -786,7 +793,7 @@ public class RxPSocket {
             // connectionManager.removeConnection(ackRxPPacket.getSrcPort(), ackRxPPacket.getDestPort());
             return null;
           }
-        }        
+        }
       }
     }
 

@@ -14,6 +14,7 @@ public class FxAClient {
   private ReceiveLoop receiveLoop;
 
   private boolean isConnected;
+  public static boolean isProcessingAction;
 
   public FxAClient(int port, int netEmuPort, InetAddress netEmuInetAddress) throws IOException {
 
@@ -24,6 +25,7 @@ public class FxAClient {
     this.cliLoop = new CLILoop(socket, this, netEmuPort, netEmuInetAddress);
     this.receiveLoop = new ReceiveLoop(socket, this);
     this.isConnected = false;
+    isProcessingAction = false;
   }
 
   private void mainLoop() throws IOException, InterruptedException {
@@ -100,18 +102,34 @@ class ReceiveLoop implements Callable<Object> {
 
       MsgCoder coder = new FileMsgTextCoder();
       FileService service = new FileService();
+
+      boolean connectedOneTme = false;
       while (true) {
+        if (this.socket.isConnected) {
+          connectedOneTme = true;
+        }
+
+        //System.out.println("this.socket.isConnected: " +this.socket.isConnected);
       	// Make receive break when socket.isClientSending
       	// must make sure receive knows that it is a client socket
 
-      	System.out.println("isClientSending: " + this.socket.isClientSending);
-      	if (!this.socket.isClientSending) {
-      		
+      	//System.out.println("isClientSending: " + this.socket.isClientSending);
+        if (!this.socket.isClientSending) {
+
+          // Exit if the socket is disconnected
+          if (!this.socket.isConnected && connectedOneTme) {
+            System.exit(0);
+          }
+
       		try {
-		    	this.socket.receiveInBackground();
-		    } catch (IOException ioe) {
-	      	}	
-	    }
+            if (!this.client.isProcessingAction) {
+  		    	     this.socket.receiveInBackground();
+            }
+
+          } catch (Exception ioe) {
+            System.err.println(ioe.getMessage());
+          }
+	       }
       }
     }
   }
@@ -153,6 +171,14 @@ class CLILoop implements Callable<Object> {
   private void disconnect() {
     // TODO: Implement
     socket.close();
+    try {
+      client.terminate();
+    } catch(InterruptedException ie) {
+      System.err.println(ie.getMessage());
+    }
+    finally {
+      System.exit(0);
+    }
   }
 
   private void setWindowSize(int windowSize) {
@@ -161,6 +187,7 @@ class CLILoop implements Callable<Object> {
 
   private void getFile(String filename) throws IOException {
     synchronized(socket) {
+      this.client.isProcessingAction = true;
       // Send the request to the server
       FileMsg request = new FileMsg(true, filename, null);
       byte[] encodedMsg = coder.toWire(request);
@@ -191,6 +218,7 @@ class CLILoop implements Callable<Object> {
       finally {
         if (fs != null) {
           fs.close();
+          this.client.isProcessingAction = false;
         }
       }
       System.out.println("File was downloaded successfully.\nSaved as: " + filename);
@@ -199,6 +227,7 @@ class CLILoop implements Callable<Object> {
 
   private void postFile(String filename) throws IOException {
     synchronized(this) {
+      this.client.isProcessingAction = true;
       FileInputStream newFile = null;
       try {
         newFile = new FileInputStream(filename);
@@ -240,6 +269,9 @@ class CLILoop implements Callable<Object> {
         } catch(Exception e) {
           System.err.println("The file could not be saved.");
           System.err.println(e.getMessage());
+        }
+        finally {
+          this.client.isProcessingAction = true;
         }
       }
     }
